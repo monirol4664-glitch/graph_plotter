@@ -1,5 +1,5 @@
 name: graph_plotter
-description: Interactive equation graph plotter
+description: Plot graphs from mathematical equations
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -11,7 +11,6 @@ dependencies:
     sdk: flutter
   math_expressions: ^2.0.4
   cupertino_icons: ^1.0.2
-  flutter_slidable: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -20,5 +19,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/icons/logo.png
