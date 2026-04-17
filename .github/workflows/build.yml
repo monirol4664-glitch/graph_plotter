@@ -1,0 +1,68 @@
+name: Build Graph Plotter APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+    
+    - name: Backup your code
+      run: |
+        cp -r lib lib.backup
+        cp pubspec.yaml pubspec.yaml.backup
+    
+    - name: Generate Android files
+      run: flutter create --platforms=android . --overwrite
+    
+    - name: Restore your code
+      run: |
+        rm -rf lib
+        mv lib.backup lib
+        cp pubspec.yaml.backup pubspec.yaml
+    
+    - name: Replace default icons with custom logo
+      run: |
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        
+        if [ -f "assets/icons/logo.png" ]; then
+          cp assets/icons/logo.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp assets/icons/logo.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp assets/icons/logo.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp assets/icons/logo.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp assets/icons/logo.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        fi
+    
+    - name: Get dependencies
+      run: flutter pub get
+    
+    - name: Build APK
+      run: flutter build apk --release
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: graph_plotter
+        path: build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
