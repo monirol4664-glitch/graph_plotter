@@ -1,40 +1,20 @@
-name: Build APK
+name: graph_plotter
+description: Mathematica-style mathematical playground
+publish_to: 'none'
+version: 1.0.0+1
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+environment:
+  sdk: '>=3.0.0 <4.0.0'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.19.0'
-    - name: Backup code and dependencies
-      run: |
-        cp lib/main.dart main.dart.backup
-        cp pubspec.yaml pubspec.yaml.backup
-    - name: Generate Android files
-      run: flutter create --platforms=android . --overwrite
-    - name: Restore code and dependencies
-      run: |
-        cp main.dart.backup lib/main.dart
-        cp pubspec.yaml.backup pubspec.yaml
-    - name: Get dependencies
-      run: flutter pub get
-    - name: Build APK
-      run: flutter build apk --release
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: mathematica-playground
-        path: build/app/outputs/flutter-apk/app-release.apk
+dependencies:
+  flutter:
+    sdk: flutter
+  math_expressions: ^2.0.4
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
