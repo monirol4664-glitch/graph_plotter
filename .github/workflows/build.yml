@@ -1,42 +1,28 @@
-name: Build Math Suite APK
+name: Android Build
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.19.0'
-        channel: 'stable'
-    - name: Backup code AND pubspec
-      run: |
-        cp lib/main.dart main.dart.backup
-        cp pubspec.yaml pubspec.yaml.backup
-    - name: Generate Android files
-      run: flutter create --platforms=android . --overwrite
-    - name: Restore code AND pubspec
-      run: |
-        cp main.dart.backup lib/main.dart
-        cp pubspec.yaml.backup pubspec.yaml
-    - name: Get dependencies
-      run: flutter pub get
-    - name: Build APK
-      run: flutter build apk --release
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: math-suite
-        path: build/app/outputs/flutter-apk/app-release.apk
-        retention-days: 30
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-debug-apk
+          path: build/outputs/apk/debug/*.apk
