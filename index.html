@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Attendance</title>
+    <style>
+        :root { --bg:#f8fafc; --card:#fff; --primary:#2563eb; --success:#22c55e; --warn:#f59e0b; --danger:#ef4444; --text:#1e293b; --border:#e2e8f0; }
+        * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,-apple-system,sans-serif; }
+        body { background:var(--bg); color:var(--text); padding-bottom:60px; }
+        header { background:var(--primary); color:#fff; padding:16px; text-align:center; position:sticky; top:0; z-index:10; }
+        nav { display:flex; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:48px; z-index:9; }
+        nav button { flex:1; padding:12px; border:none; background:transparent; font-weight:600; cursor:pointer; }
+        nav button.active { border-bottom:3px solid var(--primary); color:var(--primary); }
+        main { padding:16px; max-width:600px; margin:0 auto; }
+        section { display:none; }
+        section.active { display:block; }
+        .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-bottom:12px; font-size:18px; }
+        input, select, button { width:100%; padding:12px; margin:6px 0; border:1px solid var(--border); border-radius:8px; font-size:15px; }
+        button.primary { background:var(--primary); color:#fff; border:none; }
+        .student-row { display:flex; align-items:center; gap:8px; margin:8px 0; padding:10px; background:#f8fafc; border-radius:8px; }
+        .status-btn { padding:6px 12px; font-size:13px; width:auto; margin:0 2px; border:1px solid var(--border); background:#fff; border-radius:6px; cursor:pointer; }
+        .status-btn.present { background:var(--success); color:#fff; border-color:var(--success); }
+        .status-btn.absent { background:var(--danger); color:#fff; border-color:var(--danger); }
+        .status-btn.late { background:var(--warn); color:#fff; border-color:var(--warn); }
+        table { width:100%; border-collapse:collapse; margin-top:8px; }
+        th, td { padding:10px; text-align:left; border-bottom:1px solid var(--border); }
+        .empty { text-align:center; padding:20px; color:#64748b; }
+        .actions { display:flex; gap:8px; margin-top:12px; }
+        .actions button { flex:1; }
+    </style>
+</head>
+<body>
+    <header>Digital Attendance</header>
+    <nav>
+        <button class="active" data-tab="courses">Courses</button>
+        <button data-tab="students">Students</button>
+        <button data-tab="attendance">Attendance</button>
+        <button data-tab="records">Records</button>
+    </nav>
+    <main>
+        <section id="courses" class="active">
+            <div class="card">
+                <h2>Add Course</h2>
+                <input type="text" id="courseName" placeholder="Course name (e.g., CS101)">
+                <button class="primary" onclick="addCourse()">Create Course</button>
+            </div>
+            <div id="courseList"></div>
+        </section>
+        <section id="students">
+            <div class="card">
+                <h2>Register Student</h2>
+                <select id="studentCourseSelect"><option value="">Select Course</option></select>
+                <input type="text" id="studentName" placeholder="Student Name">
+                <input type="text" id="studentRoll" placeholder="Roll Number">
+                <button class="primary" onclick="addStudent()">Add Student</button>
+            </div>
+            <div id="studentList"></div>
+        </section>
+
+        <section id="attendance">
+            <div class="card">
+                <h2>Mark Attendance</h2>
+                <select id="attCourseSelect"><option value="">Select Course</option></select>
+                <input type="date" id="attDate">
+                <button class="primary" onclick="loadAttendanceSheet()">Load Sheet</button>
+            </div>
+            <div id="attSheet" class="card" style="display:none;">
+                <h3 id="attTitle"></h3>
+                <div id="attList"></div>
+                <div class="actions">
+                    <button onclick="saveAttendance()">💾 Save</button>
+                    <button onclick="markAll('Present')">✅ All Present</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="records">
+            <div class="card">
+                <h2>View & Export</h2>
+                <select id="recCourseSelect"><option value="">Select Course</option></select>
+                <button class="primary" onclick="loadRecords()">Load Records</button>
+                <div style="margin-top:8px;">
+                    <button onclick="exportCSV()">📥 Export CSV</button>
+                    <button onclick="clearData()" style="background:var(--danger);color:#fff;border:none;">🗑️ Clear All Data</button>
+                </div>
+            </div>
+            <div id="recTable" class="card" style="display:none;">
+                <table><thead><tr><th>Date</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="recBody"></tbody></table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Database Helpers
+        const DB = {
+            get(key) { return JSON.parse(localStorage.getItem(`att_${key}`) || '[]'); },
+            set(key, val) { localStorage.setItem(`att_${key}`, JSON.stringify(val)); },            id() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+        };
+
+        // UI Navigation
+        document.querySelectorAll('nav button').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('nav button, section').forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+                refreshDropdowns();
+            };
+        });
+
+        // Course Management
+        function addCourse() {
+            const name = document.getElementById('courseName').value.trim();
+            if (!name) return alert('Enter course name');
+            const courses = DB.get('courses');
+            if (courses.find(c => c.name.toLowerCase() === name.toLowerCase())) return alert('Course exists');
+            courses.push({ id: DB.id(), name });
+            DB.set('courses', courses);
+            document.getElementById('courseName').value = '';
+            renderCourses(); refreshDropdowns();
+        }
+
+        function renderCourses() {
+            const list = document.getElementById('courseList');
+            const courses = DB.get('courses');
+            if (!courses.length) return list.innerHTML = '<div class="empty">No courses yet</div>';
+            list.innerHTML = courses.map(c => `<div class="card"><strong>${c.name}</strong> <button onclick="deleteCourse('${c.id}')" style="width:auto;float:right;background:var(--danger);color:#fff;border:none;">Delete</button></div>`).join('');
+        }
+
+        function deleteCourse(id) {
+            if (!confirm('Delete course and all related data?')) return;
+            let courses = DB.get('courses').filter(c => c.id !== id);
+            let students = DB.get('students').filter(s => s.courseId !== id);
+            let records = DB.get('records').filter(r => r.courseId !== id);
+            DB.set('courses', courses); DB.set('students', students); DB.set('records', records);
+            renderCourses(); refreshDropdowns();
+        }
+
+        // Student Management
+        function addStudent() {
+            const courseId = document.getElementById('studentCourseSelect').value;
+            const name = document.getElementById('studentName').value.trim();
+            const roll = document.getElementById('studentRoll').value.trim();
+            if (!courseId || !name || !roll) return alert('Fill all fields');
+            const students = DB.get('students');
+            if (students.find(s => s.courseId === courseId && s.roll === roll)) return alert('Roll number exists in this course');
+            students.push({ id: DB.id(), courseId, name, roll });            DB.set('students', students);
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentRoll').value = '';
+            renderStudents(courseId); refreshDropdowns();
+        }
+
+        function renderStudents(courseId) {
+            const list = document.getElementById('studentList');
+            if (!courseId) return list.innerHTML = '<div class="empty">Select a course first</div>';
+            const students = DB.get('students').filter(s => s.courseId === courseId);
+            if (!students.length) return list.innerHTML = '<div class="empty">No students registered</div>';
+            list.innerHTML = `<div class="card"><h3>Students</h3>${students.map(s => `<div class="student-row"><span><strong>${s.roll}</strong> - ${s.name}</span><button onclick="deleteStudent('${s.id}')" style="width:auto;margin-left:auto;background:var(--danger);color:#fff;border:none;">×</button></div>`).join('')}</div>`;
+        }
+
+        function deleteStudent(id) {
+            if (!confirm('Remove student?')) return;
+            let students = DB.get('students').filter(s => s.id !== id);
+            let records = DB.get('records').filter(r => !r.records.some(rec => rec.studentId === id));
+            DB.set('students', students); DB.set('records', records);
+            document.getElementById('studentCourseSelect').value && renderStudents(document.getElementById('studentCourseSelect').value);
+        }
+
+        // Attendance
+        function loadAttendanceSheet() {
+            const courseId = document.getElementById('attCourseSelect').value;
+            const date = document.getElementById('attDate').value;
+            if (!courseId || !date) return alert('Select course and date');
+            const students = DB.get('students').filter(s => s.courseId === courseId);
+            if (!students.length) return alert('No students in this course');
+
+            const sheet = document.getElementById('attSheet');
+            const list = document.getElementById('attList');
+            const title = document.getElementById('attTitle');
+            sheet.style.display = 'block';
+            title.textContent = `${students[0]?.courseName || ''} - ${date}`;
+
+            // Check existing
+            const existing = DB.get('records').find(r => r.courseId === courseId && r.date === date);
+            const statusMap = existing ? Object.fromEntries(existing.records.map(r => [r.studentId, r.status])) : {};
+
+            list.innerHTML = students.map(s => `
+                <div class="student-row">
+                    <div style="flex:1"><strong>${s.roll}</strong><br>${s.name}</div>
+                    <div>
+                        <button class="status-btn ${statusMap[s.id]==='Present'?'present':''}" onclick="setStatus('${s.id}','Present',this)">P</button>
+                        <button class="status-btn ${statusMap[s.id]==='Absent'?'absent':''}" onclick="setStatus('${s.id}','Absent',this)">A</button>
+                        <button class="status-btn ${statusMap[s.id]==='Late'?'late':''}" onclick="setStatus('${s.id}','Late',this)">L</button>
+                    </div>
+                </div>
+            `).join('');            list.dataset.courseId = courseId;
+            list.dataset.date = date;
+        }
+
+        function setStatus(studentId, status, btn) {
+            const row = btn.parentElement;
+            row.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
+            btn.classList.add(status.toLowerCase());
+            btn.dataset.status = status;
+            btn.dataset.studentId = studentId;
+        }
+
+        function markAll(status) {
+            document.querySelectorAll('#attList .status-btn').forEach(btn => {
+                if (btn.textContent === status[0]) btn.click();
+            });
+        }
+
+        function saveAttendance() {
+            const courseId = document.getElementById('attList').dataset.courseId;
+            const date = document.getElementById('attList').dataset.date;
+            const records = [];
+            document.querySelectorAll('#attList .status-btn.present, #attList .status-btn.absent, #attList .status-btn.late').forEach(btn => {
+                if (btn.parentElement.querySelector('.status-btn')) { // Only first button of group
+                    records.push({ studentId: btn.dataset.studentId, status: btn.textContent === 'P' ? 'Present' : btn.textContent === 'A' ? 'Absent' : 'Late' });
+                }
+            });
+            if (records.length === 0) return alert('Mark at least one student');
+            
+            let all = DB.get('records').filter(r => !(r.courseId === courseId && r.date === date));
+            all.push({ courseId, date, records });
+            DB.set('records', all);
+            alert('Attendance saved!');
+        }
+
+        // Records & Export
+        function loadRecords() {
+            const courseId = document.getElementById('recCourseSelect').value;
+            const table = document.getElementById('recTable');
+            const body = document.getElementById('recBody');
+            if (!courseId) return alert('Select a course');
+            table.style.display = 'block';
+
+            const recs = DB.get('records').filter(r => r.courseId === courseId).sort((a,b) => b.date.localeCompare(a.date));
+            const students = DB.get('students');
+            body.innerHTML = recs.flatMap(r => r.records.map(rec => {
+                const s = students.find(st => st.id === rec.studentId) || {name:'?', roll:'?'};
+                return `<tr><td>${r.date}</td><td>${s.name}</td><td>${s.roll}</td><td>${rec.status}</td></tr>`;
+            })).join('');
+        }
+        function exportCSV() {
+            const courseId = document.getElementById('recCourseSelect').value;
+            if (!courseId) return alert('Select a course to export');
+            const recs = DB.get('records').filter(r => r.courseId === courseId);
+            const students = DB.get('students');
+            let csv = 'Date,Student Name,Roll,Status\n';
+            recs.forEach(r => r.records.forEach(rec => {
+                const s = students.find(st => st.id === rec.studentId) || {name:'Unknown', roll:'?'};
+                csv += `"${r.date}","${s.name}","${s.roll}","${rec.status}"\n`;
+            }));
+            const blob = new Blob([csv], {type:'text/csv'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `attendance_${courseId}.csv`; a.click();
+        }
+
+        function clearData() {
+            if (confirm('Delete ALL attendance data permanently?')) {
+                localStorage.removeItem('att_courses');
+                localStorage.removeItem('att_students');
+                localStorage.removeItem('att_records');
+                location.reload();
+            }
+        }
+
+        // Helpers
+        function refreshDropdowns() {
+            const courses = DB.get('courses');
+            const opts = courses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            document.getElementById('studentCourseSelect').innerHTML = '<option value="">Select Course</option>' + opts;
+            document.getElementById('attCourseSelect').innerHTML = '<option value="">Select Course</option>' + opts;
+            document.getElementById('recCourseSelect').innerHTML = '<option value="">Select Course</option>' + opts;
+            document.getElementById('attCourseSelect').onchange = () => document.getElementById('studentCourseSelect').value = document.getElementById('attCourseSelect').value;
+            document.getElementById('studentCourseSelect').onchange = (e) => renderStudents(e.target.value);
+            if (!document.getElementById('attDate').value) document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
+            renderCourses();
+        }
+        refreshDropdowns();
+    </script>
+</body>
+</html>
