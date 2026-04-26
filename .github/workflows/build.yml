@@ -27,27 +27,11 @@ jobs:
       - name: Accept Android Licenses
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" > /dev/null
 
-      - name: Generate Gradle Wrapper & Build Files
+      - name: Generate Build Files
         run: |
-          # Generate gradle-wrapper.properties
-          mkdir -p gradle/wrapper
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-
-          # Generate minimal gradlew script (Unix)
-          cat > gradlew << 'GRADLEW'
-          #!/bin/sh
-          exec java -jar "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" "$@"
-          GRADLEW
-          chmod +x gradlew
-          # Generate settings.gradle with pluginManagement for Google repo
+          # settings.gradle with pluginManagement for Google repo
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -63,27 +47,20 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.name = "DigitalAttendance"
-          EOF
+          rootProject.name = "DigitalAttendance"          EOF
 
-          # Generate gradle.properties
+          # gradle.properties
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.nonTransitiveRClass=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          org.gradle.configuration-cache=true
           EOF
 
-          # Generate minimal res/ structure
+          # Minimal res/ structure
           mkdir -p res/values
-          cat > res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Attendance</string>
-          </resources>
-          EOF
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
-          # Generate build.gradle with compatible AGP 8.1.4
+          # build.gradle with compatible versions
           cat > build.gradle << 'EOF'
           plugins {
               id 'com.android.application' version '8.1.4'
@@ -96,7 +73,8 @@ jobs:
               defaultConfig {
                   applicationId "com.attendance.digital"
                   minSdk 24
-                  targetSdk 34                  versionCode 1
+                  targetSdk 34
+                  versionCode 1
                   versionName "1.0"
               }
 
@@ -119,15 +97,17 @@ jobs:
                   checkReleaseBuilds false
               }
           }
-
           repositories {
               google()
               mavenCentral()
           }
           EOF
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
