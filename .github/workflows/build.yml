@@ -1,4 +1,4 @@
-name: Android Build
+name: Android APK Build
 
 on:
   push:
@@ -24,26 +24,30 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android Licenses
+      - name: Accept Licenses & Install SDK
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
-      - name: Generate Project & Gradle Wrapper
-        run: |
-          # 1. Create minimal required directories & files
-          mkdir -p res/values
-          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
+      - name: Setup Gradle CLI
+        uses: gradle/actions/setup-gradle@v3
 
+      - name: Generate Project Structure & Wrapper
+        run: |
+          # 1. Minimal Android resource dir (strict AGP requirement)
+          mkdir -p res/values
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
+
+          # 2. Gradle properties
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.nonTransitiveRClass=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
+          # 3. Settings (CRITICAL: pluginManagement for Google Maven)
           cat > settings.gradle << 'EOF'
-          pluginManagement {
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          pluginManagement {              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -52,37 +56,48 @@ jobs:
           rootProject.name = "DigitalAttendance"
           EOF
 
+          # 4. Build file (root mapping + locked compatible versions)
           cat > build.gradle << 'EOF'
           plugins { id 'com.android.application' version '8.1.4' }
           android {
               namespace 'com.attendance.digital'
               compileSdk 34
-              defaultConfig { 
+              defaultConfig {
                   applicationId "com.attendance.digital"
-                  minSdk 24; targetSdk 34; versionCode 1; versionName "1.0" 
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
               }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              sourceSets { 
-                  main { 
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              sourceSets {
+                  main {
                       manifest.srcFile 'AndroidManifest.xml'
-                      java.srcDirs = ['.']; assets.srcDirs = ['.']; res.srcDirs = ['res'] 
-                  } 
+                      java.srcDirs = ['.']
+                      assets.srcDirs = ['.']
+                      res.srcDirs = ['res']
+                  }
               }
-              lint { abortOnError false; checkReleaseBuilds false }
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
           }
           repositories { google(); mavenCentral() }
           EOF
 
-          # 2. Generate official Gradle Wrapper (uses pre-installed Gradle on ubuntu-latest)
+          # 5. Generate official Gradle Wrapper (uses CLI from setup-gradle)
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Upload APK        uses: actions/upload-artifact@v4
         with:
-          name: attendance-debug-apk
+          name: attendance-app-debug
           path: build/outputs/apk/debug/app-debug.apk
           retention-days: 7
