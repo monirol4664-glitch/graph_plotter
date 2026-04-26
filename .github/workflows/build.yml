@@ -27,87 +27,58 @@ jobs:
       - name: Accept Android Licenses
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" > /dev/null
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
-      - name: Generate Build Files
+      - name: Generate Project & Gradle Wrapper
         run: |
-          # settings.gradle with pluginManagement for Google repo
-          cat > settings.gradle << 'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.name = "DigitalAttendance"          EOF
+          # 1. Create minimal required directories & files
+          mkdir -p res/values
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
-          # gradle.properties
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.nonTransitiveRClass=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
-          # Minimal res/ structure
-          mkdir -p res/values
-          echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
-
-          # build.gradle with compatible versions
-          cat > build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.1.4'
+          cat > settings.gradle << 'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "DigitalAttendance"
+          EOF
 
+          cat > build.gradle << 'EOF'
+          plugins { id 'com.android.application' version '8.1.4' }
           android {
               namespace 'com.attendance.digital'
               compileSdk 34
-
-              defaultConfig {
+              defaultConfig { 
                   applicationId "com.attendance.digital"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  minSdk 24; targetSdk 34; versionCode 1; versionName "1.0" 
               }
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-
-              sourceSets {
-                  main {
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+              sourceSets { 
+                  main { 
                       manifest.srcFile 'AndroidManifest.xml'
-                      java.srcDirs = ['.']
-                      assets.srcDirs = ['.']
-                      res.srcDirs = ['res']
-                  }
+                      java.srcDirs = ['.']; assets.srcDirs = ['.']; res.srcDirs = ['res'] 
+                  } 
               }
-
-              lint {
-                  abortOnError false
-                  checkReleaseBuilds false
-              }
+              lint { abortOnError false; checkReleaseBuilds false }
           }
-          repositories {
-              google()
-              mavenCentral()
-          }
+          repositories { google(); mavenCentral() }
           EOF
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+          # 2. Generate official Gradle Wrapper (uses pre-installed Gradle on ubuntu-latest)
+          gradle wrapper --gradle-version 8.4
+          chmod +x gradlew
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
