@@ -1,9 +1,0 @@
-.dart_tool/
-.pub/
-build/
-android/
-ios/
-*.lock
-.DS_Store
-lib.backup/
-*.backup
