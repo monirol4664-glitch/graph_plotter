@@ -1,62 +1,50 @@
-name: Android Build
-on: [push, pull_request]
+- name: Generate Build System
+  run: |
+    cat > settings.gradle << 'EOF'
+    pluginManagement {
+        repositories {
+            google()
+            mavenCentral()
+            gradlePluginPortal()
+        }
+    }
+    dependencyResolutionManagement {
+        repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+        repositories {
+            google()
+            mavenCentral()
+        }
+    }
+    rootProject.name = "DigitalAttendance"
+    EOF
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+    cat > gradle.properties << 'EOF'
+    android.useAndroidX=true
+    org.gradle.jvmargs=-Xmx2048m
+    android.nonTransitiveRClass=true
+    EOF
 
-      - name: Generate Build System
-        run: |
-          cat > settings.gradle << 'EOF'
-          rootProject.name = "DigitalAttendance"
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories { google(); mavenCentral() }
-          }
-          EOF
+    mkdir -p res/values
+    echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
-          cat > gradle.properties << 'EOF'
-          android.useAndroidX=true
-          org.gradle.jvmargs=-Xmx2048m
-          EOF
-
-          mkdir -p res/values
-          cat > res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources><string name="app_name">Attendance</string></resources>
-          EOF
-
-          cat > build.gradle << 'EOF'
-          plugins { id 'com.android.application' version '8.2.0' }
-          android {
-              namespace 'com.attendance.digital'
-              compileSdk 34
-              defaultConfig {
-                  applicationId "com.attendance.digital"
-                  minSdk 24 targetSdk 34 versionCode 1 versionName "1.0"
-              }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17 targetCompatibility JavaVersion.VERSION_17 }
-              sourceSets {
-                  main {
-                      manifest.srcFile 'AndroidManifest.xml'
-                      java.srcDirs = ['.']
-                      assets.srcDirs = ['.']
-                      res.srcDirs = ['res']
-                  }
-              }
-          }
-          repositories { google(); mavenCentral() }
-          EOF
-
-      - uses: gradle/actions/setup-gradle@v3
-      - run: gradle assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: attendance-debug
-          path: build/outputs/apk/debug/*.apk
+    cat > build.gradle << 'EOF'
+    plugins { id 'com.android.application' version '8.2.0' }
+    android {
+        namespace 'com.attendance.digital'
+        compileSdk 34
+        defaultConfig {
+            applicationId "com.attendance.digital"
+            minSdk 24 targetSdk 34 versionCode 1 versionName "1.0"
+        }
+        compileOptions { sourceCompatibility JavaVersion.VERSION_17 targetCompatibility JavaVersion.VERSION_17 }
+        sourceSets {
+            main {
+                manifest.srcFile 'AndroidManifest.xml'
+                java.srcDirs = ['.']
+                assets.srcDirs = ['.']
+                res.srcDirs = ['res']
+            }
+        }
+    }
+    repositories { google(); mavenCentral() }
+    EOF
