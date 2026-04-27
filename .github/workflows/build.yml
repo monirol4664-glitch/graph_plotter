@@ -34,18 +34,18 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      - name: Generate Project & Gradle Wrapper
+      - name: Generate Project Files
         run: |
           mkdir -p res/values
           echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
-          cat > gradle.properties << 'EOF'
+          cat > gradle.properties << 'GRADLE_PROPS'
 android.useAndroidX=true
 android.nonTransitiveRClass=true
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-EOF
+GRADLE_PROPS
 
-          cat > settings.gradle << 'EOF'
+          cat > settings.gradle << 'SETTINGS'
 pluginManagement {
     repositories { google(); mavenCentral(); gradlePluginPortal() }}
 dependencyResolutionManagement {
@@ -53,9 +53,9 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "DigitalAttendance"
-EOF
+SETTINGS
 
-          cat > build.gradle << 'EOF'
+          cat > build.gradle << 'BUILD_GRADLE'
 plugins {
     id 'com.android.application' version '8.1.4'
 }
@@ -96,7 +96,7 @@ repositories {
     google()
     mavenCentral()
 }
-EOF
+BUILD_GRADLE
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
