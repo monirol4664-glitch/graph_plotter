@@ -27,14 +27,17 @@ jobs:
       - name: Accept Licenses & Install SDK
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest" > /dev/null
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
-      - name: Setup Gradle CLI
+      # 🔑 CRITICAL: Force Gradle 8.4 (compatible with AGP 8.1.4)
+      - name: Setup Gradle 8.4
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Generate Project & Gradle Wrapper
         run: |
-          # 1. Create minimal Android resource dir (strict AGP requirement)
+          # 1. Minimal Android resource dir
           mkdir -p res/values
           echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
@@ -45,7 +48,7 @@ jobs:
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
-          # 3. Settings (CRITICAL: pluginManagement for Google Maven)
+          # 3. Settings (pluginManagement for Google Maven)
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
@@ -57,7 +60,7 @@ jobs:
           rootProject.name = "DigitalAttendance"
           EOF
 
-          # 4. Build file (root mapping + locked compatible versions)
+          # 4. Build file (AGP 8.1.4 + root mapping)
           cat > build.gradle << 'EOF'
           plugins { id 'com.android.application' version '8.1.4' }
           android {
@@ -81,7 +84,7 @@ jobs:
           repositories { google(); mavenCentral() }
           EOF
 
-          # 5. Generate official Gradle Wrapper (creates JAR, properties & scripts)
+          # 5. Generate wrapper using the now-correct Gradle 8.4 CLI
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
