@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Digital Attendance</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --bg:#f8fafc; --card:#ffffff; --primary:#3b82f6; --primary-hover:#2563eb; --success:#10b981; --warn:#f59e0b; --danger:#ef4444; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --offline:#f97316; }
+        * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,-apple-system,sans-serif; -webkit-tap-highlight-color:transparent; }
+        body { background:var(--bg); color:var(--text); padding-bottom:80px; }
+        header { background:linear-gradient(135deg, var(--primary), #1d4ed8); color:#fff; padding:18px 16px; text-align:center; position:sticky; top:0; z-index:50; box-shadow:0 4px 12px rgba(59,130,246,0.3); }
+        header h1 { font-size:18px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; }
+        #offline-banner { background:var(--offline); color:#fff; padding:8px; text-align:center; font-size:13px; font-weight:600; display:none; position:sticky; top:56px; z-index:49; }
+        nav { display:flex; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:56px; z-index:40; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        nav button { flex:1; min-width:70px; padding:12px 4px; border:none; background:transparent; color:var(--muted); font-weight:600; cursor:pointer; transition:0.2s; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; }
+        nav button i { font-size:15px; }
+        nav button.active { color:var(--primary); border-bottom:3px solid var(--primary); background:rgba(59,130,246,0.05); }
+        main { padding:16px; max-width:600px; margin:0 auto; }
+        section { display:none; animation:fadeIn 0.3s ease; }
+        section.active { display:block; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .card { background:var(--card); border-radius:16px; padding:18px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.04); border:1px solid var(--border); }
+        h2 { margin-bottom:14px; font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px; }
+        .form-group { margin-bottom:12px; position:relative; }
+        input, select { width:100%; padding:13px; border:1.5px solid var(--border); border-radius:12px; font-size:15px; background:#fafafa; transition:0.2s; outline:none; }
+        input:focus, select:focus { border-color:var(--primary); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
+        button.btn { width:100%; padding:13px; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; transition:0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+        button.btn.primary { background:var(--primary); color:#fff; }
+        button.btn.primary:hover { background:var(--primary-hover); transform:translateY(-1px); }
+        button.btn:active { transform:scale(0.98); }
+        button.btn:disabled { opacity:0.6; cursor:wait; transform:none; }
+        .item-row { display:flex; align-items:center; justify-content:space-between; padding:14px; background:#f8fafc; border-radius:12px; margin-bottom:10px; border:1px solid var(--border); transition:0.2s; }
+        .item-row:hover { background:#f1f5f9; border-color:#cbd5e1; }
+        .item-info h3 { font-size:15px; margin-bottom:2px; }
+        .item-info small { color:var(--muted); font-size:13px; }
+        .btn-icon { width:34px; height:34px; border:none; background:#fee2e2; color:var(--danger); border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; }
+        .btn-icon:hover { background:var(--danger); color:#fff; }
+        .status-group { display:flex; gap:6px; }
+        .status-btn { width:30px; height:30px; border:1.5px solid var(--border); background:#fff; border-radius:8px; cursor:pointer; font-weight:700; color:var(--muted); transition:0.2s; display:flex; align-items:center; justify-content:center; font-size:12px; }
+        .status-btn.present { background:var(--success); color:#fff; border-color:var(--success); }
+        .status-btn.absent { background:var(--danger); color:#fff; border-color:var(--danger); }
+        .status-btn.late { background:var(--warn); color:#fff; border-color:var(--warn); }
+        .search-bar { position:relative; margin-bottom:12px; }
+        .search-bar i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+        .search-bar input { padding-left:36px; }
+        table { width:100%; border-collapse:separate; border-spacing:0; margin-top:8px; font-size:14px; }
+        th { background:#f1f5f9; font-weight:600; color:var(--muted); padding:12px 8px; text-align:left; }
+        td { padding:12px 8px; border-bottom:1px solid var(--border); background:#fff; }
+        .empty { text-align:center; padding:24px; color:var(--muted); font-size:14px; }
+        .export-group { display:flex; gap:8px; margin-top:12px; }
+        .export-group button { flex:1; padding:12px; border:1.5px solid var(--border); background:#fff; color:var(--text); border-radius:12px; font-weight:600; cursor:pointer; transition:0.2s; display:flex; align-items:center; justify-content:center; gap:6px; }
+        .tag { display:inline-flex; align-items:center; padding:4px 8px; background:var(--primary); color:#fff; border-radius:6px; font-size:11px; font-weight:600; margin-left:8px; }
+        .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#0f172a; color:#fff; padding:12px 20px; border-radius:50px; font-size:14px; opacity:0; transition:0.3s; z-index:100; display:flex; align-items:center; gap:8px; pointer-events:none; white-space:nowrap; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        .sync-badge { background:#dcfce7; color:var(--success); padding:4px 8px; border-radius:20px; font-size:11px; font-weight:600; display:none; margin-left:auto; }
+        .sync-badge.pending { background:#fef3c7; color:#b45309; display:inline-flex; }
+    </style>
+</head>
+<body>
+    <header><h1><i class="fa-solid fa-clipboard-check"></i> Digital Attendance</h1></header>
+    <div id="offline-banner"><i class="fa-solid fa-wifi-slash"></i> You're offline. Changes saved locally. Sync when back online.</div>
+    <nav>
+        <button class="active" data-tab="sessions"><i class="fa-solid fa-calendar-days"></i> Sessions</button>
+        <button data-tab="courses"><i class="fa-solid fa-book-open"></i> Courses</button>
+        <button data-tab="students"><i class="fa-solid fa-user-graduate"></i> Students</button>
+        <button data-tab="attendance"><i class="fa-solid fa-list-check"></i> Attendance</button>
+        <button data-tab="reports"><i class="fa-solid fa-chart-pie"></i> Report</button>
+    </nav>
+    <main>
+        <section id="sessions" class="active">
+            <div class="card">
+                <h2><i class="fa-solid fa-plus-circle" style="color:var(--primary)"></i> Create Session</h2>
+                <div class="form-group"><input type="text" id="sessionName" placeholder="e.g., 2022-23"></div>
+                <button class="btn primary" id="addSessionBtn" onclick="handleAdd('sessions')"><i class="fa-solid fa-save"></i> Create Session</button>
+            </div>
+            <div id="sessionList"></div>
+        </section>
+
+        <section id="courses">
+            <div class="card">
+                <h2><i class="fa-solid fa-plus-circle" style="color:var(--primary)"></i> Add Course & Teacher</h2>
+                <div class="form-group"><select id="courseSessionSelect"><option value="">Select Session</option></select></div>
+                <div class="form-group"><input type="text" id="courseName" placeholder="Course name (e.g., Computer)"></div>
+                <div class="form-group"><input type="text" id="teacherName" placeholder="Teacher name (e.g., Mr. Smith)"></div>
+                <button class="btn primary" id="addCourseBtn" onclick="handleAdd('courses')"><i class="fa-solid fa-save"></i> Add Course</button>
+            </div>
+            <div id="courseList"></div>
+        </section>
+
+        <section id="students">
+            <div class="card">
+                <h2><i class="fa-solid fa-user-plus" style="color:var(--primary)"></i> Register Student</h2>
+                <div class="form-group"><select id="studentSessionSelect"><option value="">Select Session</option></select></div>
+                <div class="form-group"><select id="studentCourseSelect"><option value="">Select Course</option></select></div>
+                <div class="form-group"><input type="text" id="studentName" placeholder="Student Full Name"></div>
+                <div class="form-group"><input type="text" id="studentRoll" placeholder="Roll Number"></div>
+                <button class="btn primary" id="addStudentBtn" onclick="handleAdd('students')"><i class="fa-solid fa-save"></i> Register Student</button>
+            </div>
+            <div id="studentList"></div>
+        </section>
+
+        <section id="attendance">
+            <div class="card">
+                <h2><i class="fa-solid fa-pen-to-square" style="color:var(--primary)"></i> Mark Attendance</h2>
+                <div class="form-group"><select id="attSessionSelect"><option value="">Select Session</option></select></div>
+                <div class="form-group"><select id="attCourseSelect"><option value="">Select Course</option></select></div>
+                <div class="form-group"><input type="date" id="attDate"></div>
+                <button class="btn primary" onclick="loadAttendanceSheet()"><i class="fa-solid fa-download"></i> Load Sheet</button>
+            </div>
+            <div id="attSheet" class="card" style="display:none;">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="searchInput" placeholder="Search student by name..." oninput="filterStudents(this.value)">
+                </div>
+                <div id="attList"></div>
+                <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button class="btn primary" id="saveAttBtn" onclick="syncAttendance()"><i class="fa-solid fa-cloud-arrow-up"></i> Save & Sync</button>
+                    <button class="btn" style="background:#f1f5f9; color:var(--text)" onclick="markAll('Present')"><i class="fa-solid fa-check-double"></i> All Present</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="reports">
+            <div class="card">
+                <h2><i class="fa-solid fa-file-export" style="color:var(--primary)"></i> Session Report & Stats</h2>
+                <div class="form-group"><select id="reportSessionSelect"><option value="">Select Session</option></select></div>
+                <button class="btn primary" onclick="loadModeratedReport()"><i class="fa-solid fa-magnifying-glass-chart"></i> Load Records</button>
+                <button class="btn" style="background:#f8fafc; margin-top:8px;" onclick="loadStats()"><i class="fa-solid fa-percent"></i> View Attendance %</button>
+                <div class="export-group">
+                    <button onclick="exportReportCSV()"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                    <button onclick="exportReportPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                </div>
+            </div>
+            <div id="reportTable" class="card" style="display:none;"><table><thead><tr><th>Date</th><th>Course</th><th>Teacher</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="reportBody"></tbody></table></div>
+            <div id="statsTable" class="card" style="display:none;"><table><thead><tr><th>Course</th><th>Student</th><th>Roll</th><th>Total Days</th><th>Present</th><th>%</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+        </section>
+    </main>
+
+    <div class="toast" id="toast"><i class="fa-solid fa-circle-info"></i> <span id="toastMsg"></span></div>
+
+    <script>
+      const API_URL = 'https://attendance-sync-api.YOURACCOUNT.workers.dev'; // 🔑 REPLACE
+      const state = { sessions: [], courses: [], students: [] };
+      const Local = {
+        get: k => JSON.parse(localStorage.getItem(k) || 'null'),
+        set: (k,v) => localStorage.setItem(k, JSON.stringify(v)),
+        getMarks: (cid,date) => Local.get(`att_marks_${cid}_${date}`) || {},
+        setMarks: (cid,date,m) => Local.set(`att_marks_${cid}_${date}`, m),
+        queue: () => Local.get('att_sync_queue') || [],
+        pushQueue: items => { const q=Local.queue(); q.push(...items); Local.set('att_sync_queue', q); },
+        shiftQueue: count => { const q=Local.queue(); Local.set('att_sync_queue', q.slice(count)); }
+      };
+
+      const api = {
+        get: async (path, params={}) => {
+          const q=new URLSearchParams(params);
+          const res=await fetch(`${API_URL}/api/${path}${q?'?'+q:''}`, {headers:{'Accept':'application/json'}});
+          if(!res.ok) throw new Error(await res.text()||`HTTP ${res.status}`);
+          return await res.json();
+        },
+        post: async (path, body) => {
+          const res=await fetch(`${API_URL}/api/${path}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+          if(!res.ok) throw new Error(await res.text()||`HTTP ${res.status}`);
+          return await res.json();
+        },
+        delete: async (path, params) => {
+          const q=new URLSearchParams(params);
+          const res=await fetch(`${API_URL}/api/${path}?${q}`, {method:'DELETE'});
+          if(!res.ok) throw new Error(await res.text()||`HTTP ${res.status}`);
+          return await res.json();
+        }
+      };
+
+      const DB = { id: () => Date.now().toString(36)+Math.random().toString(36).substr(2) };
+      const toast = (msg, type='info') => {
+        const t=document.getElementById('toast');
+        t.innerHTML=`<i class="fa-solid fa-${type==='success'?'check-circle':type==='error'?'circle-exclamation':'circle-info'}"></i> ${msg}`;
+        t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2500);
+      };
+      const setBtn = (id, load, orig) => { const b=document.getElementById(id); if(b){b.disabled=load; b.innerHTML=load?'<i class="fa-solid fa-circle-notch fa-spin"></i> Syncing...':orig;} };
+      const renderEmpty = (el, txt) => el.innerHTML=`<div class="empty"><i class="fa-solid fa-inbox" style="font-size:24px;margin-bottom:8px;display:block"></i>${txt}</div>`;
+
+      // OFFLINE INDICATOR
+      function updateOfflineUI() {
+        document.getElementById('offline-banner').style.display = navigator.onLine ? 'none' : 'block';
+      }
+      window.addEventListener('online', updateOfflineUI);
+      window.addEventListener('offline', updateOfflineUI);
+      updateOfflineUI();
+
+      // TABS
+      document.querySelectorAll('nav button').forEach(btn => {
+        btn.onclick = async () => {
+          document.querySelectorAll('nav button, section').forEach(e=>e.classList.remove('active'));
+          btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active');
+          if(btn.dataset.tab==='sessions') await loadSessions();
+          else if(btn.dataset.tab==='courses') await refreshDropdowns();
+        };
+      });
+
+      // ADD
+      async function handleAdd(type) {
+        const btn = type==='sessions'?'addSessionBtn':type==='courses'?'addCourseBtn':'addStudentBtn';
+        setBtn(btn, true, document.getElementById(btn).innerHTML);
+        try {
+          if(type==='sessions') {
+            const n=document.getElementById('sessionName').value.trim();
+            if(!n || state.sessions.find(s=>s.name.toLowerCase()===n.toLowerCase())) throw new Error('Invalid or exists');
+            await api.post('sessions', {id:DB.id(), name:n});
+            document.getElementById('sessionName').value=''; await loadSessions(); toast('Session created','success');
+          } else if(type==='courses') {
+            const sid=document.getElementById('courseSessionSelect').value;
+            const n=document.getElementById('courseName').value.trim(), t=document.getElementById('teacherName').value.trim();
+            if(!sid||!n||!t) throw new Error('Fill all fields');
+            await api.post('courses', {id:DB.id(), session_id:sid, name:n, teacher:t});
+            document.getElementById('courseName').value=''; document.getElementById('teacherName').value=''; await loadCourses(sid); toast('Course added','success');
+          } else {
+            const cid=document.getElementById('studentCourseSelect').value;
+            const n=document.getElementById('studentName').value.trim(), r=document.getElementById('studentRoll').value.trim();
+            if(!cid||!n||!r) throw new Error('Fill all fields');
+            await api.post('students', {id:DB.id(), course_id:cid, name:n, roll:r});
+            document.getElementById('studentName').value=''; document.getElementById('studentRoll').value=''; await loadStudents(cid); toast('Student registered','success');
+          }
+        } catch(e) { toast(e.message,'error'); } finally { setBtn(btn, false, document.getElementById(btn).innerHTML); }
+      }
+
+      // LOAD & RENDER
+      async function loadSessions() {
+        state.sessions=(await api.get('sessions')).results||[];
+        const l=document.getElementById('sessionList');
+        if(!state.sessions.length) return renderEmpty(l,'No sessions yet');
+        l.innerHTML=state.sessions.map(s=>`<div class="item-row"><div class="item-info"><h3>${s.name}</h3><small><i class="fa-solid fa-book"></i> ${state.courses.filter(c=>c.session_id===s.id).length} courses</small></div><button class="btn-icon" onclick="deleteItem('sessions','${s.id}')"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+      }
+      async function loadCourses(sid) {
+        state.courses=sid?(await api.get('courses',{session_id:sid})).results||[]:[];
+        const l=document.getElementById('courseList');
+        if(!sid) return renderEmpty(l,'Select a session');
+        if(!state.courses.length) return renderEmpty(l,'No courses');
+        l.innerHTML=state.courses.map(c=>`<div class="item-row"><div class="item-info"><h3>${c.name}</h3><small><i class="fa-solid fa-chalkboard-user"></i> ${c.teacher}</small></div><button class="btn-icon" onclick="deleteItem('courses','${c.id}')"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+      }
+      async function loadStudents(cid) {
+        state.students=cid?(await api.get('students',{course_id:cid})).results||[]:[];
+        const l=document.getElementById('studentList');
+        if(!cid) return renderEmpty(l,'Select a course');
+        if(!state.students.length) return renderEmpty(l,'No students');
+        l.innerHTML=state.students.map(s=>`<div class="item-row"><div class="item-info"><h3><span class="tag">${s.roll}</span> ${s.name}</h3></div><button class="btn-icon" onclick="deleteItem('students','${s.id}')"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+      }
+
+      async function deleteItem(path, id) {
+        if(!confirm('Delete permanently? This removes linked data.')) return;
+        try { await api.delete(path,{id}); await refreshDropdowns(); if(path==='sessions') await loadSessions(); else if(path==='courses') await loadCourses(document.getElementById('courseSessionSelect').value); else await loadStudents(document.getElementById('studentCourseSelect').value); toast('Deleted','success'); }
+        catch(e) { toast(e.message,'error'); }
+      }
+
+      // ATTENDANCE (OFFLINE-FIRST)
+      async function loadAttendanceSheet() {
+        const cid=document.getElementById('attCourseSelect').value, date=document.getElementById('attDate').value;
+        if(!cid||!date) return toast('Select course & date','error');
+        const sheet=document.getElementById('attSheet'), list=document.getElementById('attList');
+        sheet.style.display='block'; list.innerHTML='⏳ Loading sheet...';
+        list.dataset.cid=cid; list.dataset.date=date;
+
+        try {
+          // Fetch students (cache locally if new)
+          let studs = state.students.filter(s=>s.course_id===cid);
+          if(!studs.length) studs = (await api.get('students',{course_id:cid})).results||[];
+          Local.set(`att_studs_${cid}`, studs);
+
+          // Fetch marks if online, else use local cache
+          let marks = {};
+          if(navigator.onLine) {
+            const existing = (await api.get('attendance',{course_id:cid, date})).results||[];
+            existing.forEach(r => marks[r.student_id]=r.status);
+          } else {
+            marks = Local.getMarks(cid, date);
+          }
+          Local.setMarks(cid, date, marks); // Ensure local persistence
+
+          // Render
+          list.innerHTML = studs.map(s => `
+            <div class="item-row student-item" style="margin-bottom:8px" data-name="${s.name.toLowerCase()}">
+              <div style="flex:1"><strong>${s.roll}</strong><br>${s.name}</div>
+              <div class="status-group">
+                <button class="status-btn ${marks[s.id]==='Present'?'present':''}" onclick="setStatus('${s.id}','Present',this)">P</button>
+                <button class="status-btn ${marks[s.id]==='Absent'?'absent':''}" onclick="setStatus('${s.id}','Absent',this)">A</button>
+                <button class="status-btn ${marks[s.id]==='Late'?'late':''}" onclick="setStatus('${s.id}','Late',this)">L</button>
+              </div>
+            </div>`).join('');
+          updatePendingBadge();
+        } catch(e) { toast(e.message,'error'); }
+      }
+
+      function setStatus(sid, status, btn) {
+        const cid=document.getElementById('attList').dataset.cid, date=document.getElementById('attList').dataset.date;
+        const row=btn.parentElement;
+        row.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('present','absent','late'));
+        btn.classList.add(status.toLowerCase()); btn.dataset.sid=sid;
+        
+        // Persist immediately to localStorage
+        const marks = Local.getMarks(cid, date);
+        marks[sid] = status;
+        Local.setMarks(cid, date, marks);
+      }
+
+      function markAll(status) {
+        document.querySelectorAll('#attList .status-btn').forEach(b => { if(b.textContent===status[0]) b.click(); });
+      }
+
+      function filterStudents(query) {
+        const q = query.toLowerCase();
+        document.querySelectorAll('.student-item').forEach(el => {
+          el.style.display = el.dataset.name.includes(q) ? 'flex' : 'none';
+        });
+      }
+
+      async function syncAttendance() {
+        const cid=document.getElementById('attList').dataset.cid, date=document.getElementById('attList').dataset.date;
+        if(!cid||!date) return toast('Load a sheet first','error');
+        
+        setBtn('saveAttBtn', true, document.getElementById('saveAttBtn').innerHTML);
+        try {
+          const marks = Local.getMarks(cid, date);
+          const recs = Object.entries(marks).map(([sid, st]) => ({course_id:cid, date, student_id:sid, status:st}));
+          if(!recs.length) throw new Error('Mark at least one student');
+
+          Local.pushQueue(recs); // Queue locally (survives app close)
+          if(navigator.onLine) await processQueue();
+          else toast('Saved offline. Will sync when connected.','info');
+          
+          updatePendingBadge();
+        } catch(e) { toast(e.message,'error'); } finally { setBtn('saveAttBtn', false, document.getElementById('saveAttBtn').innerHTML); }
+      }
+
+      async function processQueue() {
+        const q = Local.queue();
+        if(!q.length) return;
+        const batch = q.slice(0, 50); // Send in chunks
+        await api.post('attendance', batch);
+        Local.shiftQueue(batch.length);
+        toast(`✅ Synced ${batch.length} records`,'success');
+        if(Local.queue().length) await processQueue();
+      }
+
+      function updatePendingBadge() {
+        const qLen = Local.queue().length;
+        document.getElementById('saveAttBtn').innerHTML = qLen > 0 ? `<i class="fa-solid fa-cloud-arrow-up"></i> Save & Sync (${qLen} pending)` : `<i class="fa-solid fa-cloud-arrow-up"></i> Save & Sync`;
+      }
+
+      // Auto-sync when online
+      window.addEventListener('online', () => { if(Local.queue().length) syncAttendance(); });
+
+      // REPORTS & STATS
+      async function loadModeratedReport() {
+        const sid=document.getElementById('reportSessionSelect').value;
+        const tb=document.getElementById('reportTable'), body=document.getElementById('reportBody');
+        if(!sid) return toast('Select session','error');
+        tb.style.display='block'; document.getElementById('statsTable').style.display='none';
+        body.innerHTML='<tr><td colspan="6" class="empty">⏳ Loading...</td></tr>';
+        try {
+          const data=(await api.get('report',{session_id:sid})).results||[];
+          if(!data.length) return body.innerHTML='<tr><td colspan="6" class="empty">No records</td></tr>';
+          body.innerHTML=data.map(d=>`<tr><td>${d.date}</td><td>${d.course}</td><td>${d.teacher}</td><td>${d.name}</td><td>${d.roll}</td><td><span class="tag" style="background:${d.status==='Present'?'var(--success)':d.status==='Absent'?'var(--danger)':'var(--warn)'}">${d.status}</span></td></tr>`).join('');
+        } catch(e) { toast(e.message,'error'); body.innerHTML=''; }
+      }
+
+      async function loadStats() {
+        const sid=document.getElementById('reportSessionSelect').value;
+        const tb=document.getElementById('statsTable'), body=document.getElementById('statsBody');
+        if(!sid) return toast('Select session','error');
+        document.getElementById('reportTable').style.display='none';
+        tb.style.display='block'; body.innerHTML='<tr><td colspan="6" class="empty">⏳ Calculating...</td></tr>';
+        try {
+          const data=(await api.get('report',{session_id:sid})).results||[];
+          const stats = {};
+          data.forEach(r => {
+            const key = `${r.course}|||${r.name}|||${r.roll}`;
+            if(!stats[key]) stats[key]={course:r.course, name:r.name, roll:r.roll, total:0, present:0};
+            stats[key].total++;
+            if(r.status==='Present') stats[key].present++;
+          });
+          const rows = Object.values(stats).sort((a,b)=>b.present/b.total - a.present/a.total);
+          if(!rows.length) return body.innerHTML='<tr><td colspan="6" class="empty">No data</td></tr>';
+          body.innerHTML=rows.map(s=>`<tr><td>${s.course}</td><td>${s.name}</td><td>${s.roll}</td><td>${s.total}</td><td>${s.present}</td><td><strong style="color:${s.present/s.total>=0.75?'var(--success)':'var(--danger)'}">${Math.round(s.present/s.total*100)}%</strong></td></tr>`).join('');
+        } catch(e) { toast(e.message,'error'); body.innerHTML=''; }
+      }
+
+      async function exportReportCSV() {
+        const sid=document.getElementById('reportSessionSelect').value;
+        if(!sid) return toast('Select session','error');
+        const data=(await api.get('report',{session_id:sid})).results||[];
+        if(!data.length) return toast('No data','error');
+        const sName=state.sessions.find(s=>s.id===sid)?.name||'Report';
+        let csv='Date,Course,Teacher,Student,Roll,Status\n';
+        data.forEach(d=>csv+=`"${d.date}","${d.course}","${d.teacher}","${d.name}","${d.roll}","${d.status}"\n`);
+        saveToAndroid(`moderated_${sName}.csv`, csv);
+      }
+      async function exportReportPDF() {
+        const sid=document.getElementById('reportSessionSelect').value;
+        if(!sid || typeof window.jspdf==='undefined') return toast('Select session / check internet','error');
+        const data=(await api.get('report',{session_id:sid})).results||[];
+        if(!data.length) return toast('No data','error');
+        const {jsPDF}=window.jspdf; const doc=new jsPDF();
+        const sName=state.sessions.find(s=>s.id===sid)?.name||'Report';
+        doc.setFontSize(18); doc.text(`Moderated Report: ${sName}`, 14, 20);
+        doc.autoTable({head:[['Date','Course','Teacher','Student','Roll','Status']], body:data.map(d=>[d.date,d.course,d.teacher,d.name,d.roll,d.status]), startY:30, theme:'grid', styles:{fontSize:8}, headStyles:{fillColor:[59,130,246]} });
+        saveToAndroid(`moderated_${sName}.pdf`, doc.output('blob'));
+      }
+
+      function saveToAndroid(fileName, blob) {
+        if(typeof AndroidFileSaver==='undefined') return toast('Storage not available','error');
+        const r=new FileReader();
+        r.onloadend=()=>{ AndroidFileSaver.saveFile(fileName, r.result.split(',')[1], blob.type||'app/octet-stream'); toast('Saved to Downloads','success'); };
+        r.readAsDataURL(blob instanceof Blob ? blob : new Blob([blob],{type:'text/csv'}));
+      }
+
+      async function refreshDropdowns() {
+        const opts=state.sessions.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+        ['courseSessionSelect','studentSessionSelect','attSessionSelect','reportSessionSelect'].forEach(id=>{ document.getElementById(id).innerHTML='<option value="">Select Session</option>'+opts; });
+        if(!document.getElementById('attDate').value) document.getElementById('attDate').value=new Date().toISOString().split('T')[0];
+      }
+      document.getElementById('courseSessionSelect').onchange=e=>loadCourses(e.target.value);
+      document.getElementById('studentSessionSelect').onchange=async e=>{
+        const c=(await api.get('courses',{session_id:e.target.value})).results||[];
+        document.getElementById('studentCourseSelect').innerHTML='<option value="">Select Course</option>'+c.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+        document.getElementById('studentList').innerHTML='';
+      };
+      document.getElementById('attSessionSelect').onchange=async e=>{
+        const c=(await api.get('courses',{session_id:e.target.value})).results||[];
+        document.getElementById('attCourseSelect').innerHTML='<option value="">Select Course</option>'+c.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+        document.getElementById('attSheet').style.display='none';
+      };
+
+      // INIT
+      loadSessions();
+    </script>
+</body>
+</html>
