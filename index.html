@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Attendance</title>
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root { --bg:#f8fafc; --card:#fff; --primary:#2563eb; --success:#22c55e; --warn:#f59e0b; --danger:#ef4444; --text:#1e293b; --border:#e2e8f0; }
         * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,-apple-system,sans-serif; }
@@ -29,6 +32,8 @@
         .empty { text-align:center; padding:20px; color:#64748b; }
         .actions { display:flex; gap:8px; margin-top:12px; }
         .actions button { flex:1; }
+        .export-btns { display:flex; gap:8px; margin-top:12px; }
+        .export-btns button { flex:1; padding:10px; font-weight:500; }
     </style>
 </head>
 <body>
@@ -42,12 +47,12 @@
     <main>
         <section id="courses" class="active">
             <div class="card">
-                <h2>Add Course</h2>
-                <input type="text" id="courseName" placeholder="Course name (e.g., CS101)">
+                <h2>Add Course</h2>                <input type="text" id="courseName" placeholder="Course name (e.g., CS101)">
                 <button class="primary" onclick="addCourse()">Create Course</button>
             </div>
             <div id="courseList"></div>
         </section>
+
         <section id="students">
             <div class="card">
                 <h2>Register Student</h2>
@@ -81,25 +86,24 @@
                 <h2>View & Export</h2>
                 <select id="recCourseSelect"><option value="">Select Course</option></select>
                 <button class="primary" onclick="loadRecords()">Load Records</button>
-                <div style="margin-top:8px;">
+                <div class="export-btns">
                     <button onclick="exportCSV()">📥 Export CSV</button>
-                    <button onclick="clearData()" style="background:var(--danger);color:#fff;border:none;">🗑️ Clear All Data</button>
+                    <button onclick="exportPDF()">📄 Export PDF</button>
                 </div>
+                <button onclick="clearData()" style="background:var(--danger);color:#fff;border:none;margin-top:8px;">🗑️ Clear All Data</button>
             </div>
             <div id="recTable" class="card" style="display:none;">
                 <table><thead><tr><th>Date</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="recBody"></tbody></table>
             </div>
         </section>
     </main>
-
     <script>
-        // Database Helpers
         const DB = {
             get(key) { return JSON.parse(localStorage.getItem(`att_${key}`) || '[]'); },
-            set(key, val) { localStorage.setItem(`att_${key}`, JSON.stringify(val)); },            id() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+            set(key, val) { localStorage.setItem(`att_${key}`, JSON.stringify(val)); },
+            id() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
         };
 
-        // UI Navigation
         document.querySelectorAll('nav button').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('nav button, section').forEach(el => el.classList.remove('active'));
@@ -109,7 +113,6 @@
             };
         });
 
-        // Course Management
         function addCourse() {
             const name = document.getElementById('courseName').value.trim();
             if (!name) return alert('Enter course name');
@@ -137,15 +140,14 @@
             renderCourses(); refreshDropdowns();
         }
 
-        // Student Management
         function addStudent() {
             const courseId = document.getElementById('studentCourseSelect').value;
             const name = document.getElementById('studentName').value.trim();
             const roll = document.getElementById('studentRoll').value.trim();
             if (!courseId || !name || !roll) return alert('Fill all fields');
-            const students = DB.get('students');
-            if (students.find(s => s.courseId === courseId && s.roll === roll)) return alert('Roll number exists in this course');
-            students.push({ id: DB.id(), courseId, name, roll });            DB.set('students', students);
+            const students = DB.get('students');            if (students.find(s => s.courseId === courseId && s.roll === roll)) return alert('Roll number exists in this course');
+            students.push({ id: DB.id(), courseId, name, roll });
+            DB.set('students', students);
             document.getElementById('studentName').value = '';
             document.getElementById('studentRoll').value = '';
             renderStudents(courseId); refreshDropdowns();
@@ -167,7 +169,6 @@
             document.getElementById('studentCourseSelect').value && renderStudents(document.getElementById('studentCourseSelect').value);
         }
 
-        // Attendance
         function loadAttendanceSheet() {
             const courseId = document.getElementById('attCourseSelect').value;
             const date = document.getElementById('attDate').value;
@@ -179,9 +180,8 @@
             const list = document.getElementById('attList');
             const title = document.getElementById('attTitle');
             sheet.style.display = 'block';
-            title.textContent = `${students[0]?.courseName || ''} - ${date}`;
+            title.textContent = `Attendance Sheet - ${date}`;
 
-            // Check existing
             const existing = DB.get('records').find(r => r.courseId === courseId && r.date === date);
             const statusMap = existing ? Object.fromEntries(existing.records.map(r => [r.studentId, r.status])) : {};
 
@@ -216,9 +216,9 @@
             const courseId = document.getElementById('attList').dataset.courseId;
             const date = document.getElementById('attList').dataset.date;
             const records = [];
-            document.querySelectorAll('#attList .status-btn.present, #attList .status-btn.absent, #attList .status-btn.late').forEach(btn => {
-                if (btn.parentElement.querySelector('.status-btn')) { // Only first button of group
-                    records.push({ studentId: btn.dataset.studentId, status: btn.textContent === 'P' ? 'Present' : btn.textContent === 'A' ? 'Absent' : 'Late' });
+            document.querySelectorAll('#attList .status-btn').forEach(btn => {
+                if (btn.classList.length > 1) {
+                    records.push({ studentId: btn.dataset.studentId, status: btn.classList.contains('present') ? 'Present' : btn.classList.contains('absent') ? 'Absent' : 'Late' });
                 }
             });
             if (records.length === 0) return alert('Mark at least one student');
@@ -229,7 +229,6 @@
             alert('Attendance saved!');
         }
 
-        // Records & Export
         function loadRecords() {
             const courseId = document.getElementById('recCourseSelect').value;
             const table = document.getElementById('recTable');
@@ -240,7 +239,7 @@
             const recs = DB.get('records').filter(r => r.courseId === courseId).sort((a,b) => b.date.localeCompare(a.date));
             const students = DB.get('students');
             body.innerHTML = recs.flatMap(r => r.records.map(rec => {
-                const s = students.find(st => st.id === rec.studentId) || {name:'?', roll:'?'};
+                const s = students.find(st => st.id === rec.studentId) || {name:'Unknown', roll:'?'};
                 return `<tr><td>${r.date}</td><td>${s.name}</td><td>${s.roll}</td><td>${rec.status}</td></tr>`;
             })).join('');
         }
@@ -259,6 +258,45 @@
             a.download = `attendance_${courseId}.csv`; a.click();
         }
 
+        function exportPDF() {
+            const courseId = document.getElementById('recCourseSelect').value;
+            if (!courseId) return alert('Select a course to export');
+            if (typeof window.jspdf === 'undefined') return alert('PDF library not loaded. Check internet connection and reload.');
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const courses = DB.get('courses');
+            const courseName = courses.find(c => c.id === courseId)?.name || 'Unknown Course';
+            
+            doc.setFontSize(18);
+            doc.text(`Attendance Report: ${courseName}`, 14, 20);
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+            doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
+            
+            const records = DB.get('records').filter(r => r.courseId === courseId);
+            const students = DB.get('students');
+            
+            const tableData = [];
+            records.sort((a,b) => a.date.localeCompare(b.date)).forEach(r => {
+                r.records.forEach(rec => {
+                    const s = students.find(st => st.id === rec.studentId) || {name:'Unknown', roll:'?'};
+                    tableData.push([r.date, s.name, s.roll, rec.status]);
+                });
+            });
+            
+            doc.autoTable({
+                head: [['Date', 'Student Name', 'Roll', 'Status']],
+                body: tableData,
+                startY: 35,
+                theme: 'grid',
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [37, 99, 235] }            });
+            
+            doc.save(`attendance_${courseName.replace(/\s+/g, '_')}.pdf`);
+        }
+
         function clearData() {
             if (confirm('Delete ALL attendance data permanently?')) {
                 localStorage.removeItem('att_courses');
@@ -268,7 +306,6 @@
             }
         }
 
-        // Helpers
         function refreshDropdowns() {
             const courses = DB.get('courses');
             const opts = courses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
