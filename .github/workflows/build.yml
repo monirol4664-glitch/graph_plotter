@@ -33,22 +33,16 @@ jobs:
       - name: Generate Project Files
         run: |
           mkdir -p res/values
-
-          # 1. Create res/values/strings.xml
           echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
-          # 2. Create gradle.properties
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.nonTransitiveRClass=true' >> gradle.properties
           echo 'org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' >> gradle.properties
 
-          # 3. Create settings.gradle
           printf 'pluginManagement {\n    repositories { google(); mavenCentral(); gradlePluginPortal() }\n}\ndependencyResolutionManagement {\n    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n    repositories { google(); mavenCentral() }\n}\nrootProject.name = "DigitalAttendance"\n' > settings.gradle
 
-          # 4. Create build.gradle
-          printf "plugins {\n    id 'com.android.application' version '8.1.4'\n}\n\nandroid {\n    namespace 'com.attendance.digital'\n    compileSdk 34\n\n    defaultConfig {\n        applicationId \"com.attendance.digital\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n\n    sourceSets {\n        main {\n            manifest.srcFile 'AndroidManifest.xml'\n            java.srcDirs = ['.']\n            assets.srcDirs = ['.']\n            res.srcDirs = ['res']\n        }\n    }\n\n    lint {\n        abortOnError false\n        checkReleaseBuilds false\n    }\n}\n\nrepositories {\n    google()\n    mavenCentral()\n}\n" > build.gradle
+          printf "plugins {\n    id 'com.android.application' version '8.1.4'\n}\n\nandroid {\n    namespace 'com.attendance.digital'\n    compileSdk 34\n\n    defaultConfig {\n        applicationId \"com.attendance.digital\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n\n    sourceSets {\n        main {\n            manifest.srcFile 'AndroidManifest.xml'\n            java.srcDirs = ['.']\n            assets.srcDirs = ['.']\n            res.srcDirs = ['res']\n        }\n    }\n\n    lint {\n        abortOnError false\n        checkReleaseBuilds false\n    }\n}\n" > build.gradle
 
-          # 5. Generate Gradle Wrapper
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
