@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Attendance</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --bg:#f8fafc; --card:#fff; --primary:#2563eb; --success:#22c55e; --warn:#f59e0b; --danger:#ef4444; --text:#1e293b; --border:#e2e8f0; }
+        * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,-apple-system,sans-serif; }
+        body { background:var(--bg); color:var(--text); padding-bottom:60px; }
+        header { background:var(--primary); color:#fff; padding:16px; text-align:center; position:sticky; top:0; z-index:10; }
+        nav { display:flex; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:48px; z-index:9; overflow-x:auto; }
+        nav button { flex:1; padding:12px 8px; border:none; background:transparent; font-weight:600; cursor:pointer; white-space:nowrap; font-size:13px; }
+        nav button.active { border-bottom:3px solid var(--primary); color:var(--primary); }
+        main { padding:16px; max-width:600px; margin:0 auto; }
+        section { display:none; }
+        section.active { display:block; }
+        .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-bottom:12px; font-size:18px; }
+        input, select, button { width:100%; padding:12px; margin:6px 0; border:1px solid var(--border); border-radius:8px; font-size:15px; }
+        button.primary { background:var(--primary); color:#fff; border:none; }
+        .row { display:flex; align-items:center; gap:8px; margin:8px 0; padding:10px; background:#f8fafc; border-radius:8px; }
+        .status-btn { padding:6px 12px; font-size:13px; width:auto; margin:0 2px; border:1px solid var(--border); background:#fff; border-radius:6px; cursor:pointer; }
+        .status-btn.present { background:var(--success); color:#fff; border-color:var(--success); }
+        .status-btn.absent { background:var(--danger); color:#fff; border-color:var(--danger); }
+        .status-btn.late { background:var(--warn); color:#fff; border-color:var(--warn); }
+        table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+        th, td { padding:10px; text-align:left; border-bottom:1px solid var(--border); }
+        .empty { text-align:center; padding:20px; color:#64748b; }
+        .actions { display:flex; gap:8px; margin-top:12px; }
+        .actions button { flex:1; }
+        .export-btns { display:flex; gap:8px; margin-top:12px; }
+        .export-btns button { flex:1; padding:10px; font-weight:500; }
+        .tag { display:inline-block; padding:2px 6px; background:var(--primary); color:#fff; border-radius:4px; font-size:11px; margin-left:6px; }
+    </style>
+</head>
+<body>
+    <header>Digital Attendance</header>
+    <nav>
+        <button class="active" data-tab="sessions">📅 Sessions</button>
+        <button data-tab="courses">📚 Courses</button>
+        <button data-tab="students">👨‍🎓 Students</button>
+        <button data-tab="attendance">📝 Attendance</button>
+        <button data-tab="reports">📊 Moderated Report</button>
+    </nav>
+    <main>
+        <section id="sessions" class="active">
+            <div class="card"><h2>Create Session</h2><input type="text" id="sessionName" placeholder="e.g., 2022-23"><button class="primary" onclick="addSession()">Create</button></div>
+            <div id="sessionList"></div>
+        </section>
+
+        <section id="courses">
+            <div class="card">
+                <h2>Add Course & Teacher</h2>
+                <select id="courseSessionSelect"><option value="">Select Session</option></select>
+                <input type="text" id="courseName" placeholder="Course name (e.g., Computer)">
+                <input type="text" id="teacherName" placeholder="Teacher name (e.g., Mr. Smith)">
+                <button class="primary" onclick="addCourse()">Add Course</button>
+            </div>
+            <div id="courseList"></div>
+        </section>
+
+        <section id="students">
+            <div class="card">
+                <h2>Register Student</h2>
+                <select id="studentSessionSelect"><option value="">Select Session</option></select>
+                <select id="studentCourseSelect"><option value="">Select Course</option></select>
+                <input type="text" id="studentName" placeholder="Student Name">
+                <input type="text" id="studentRoll" placeholder="Roll Number">
+                <button class="primary" onclick="addStudent()">Add Student</button>
+            </div>
+            <div id="studentList"></div>
+        </section>
+
+        <section id="attendance">
+            <div class="card">
+                <h2>Mark Attendance</h2>
+                <select id="attSessionSelect"><option value="">Select Session</option></select>
+                <select id="attCourseSelect"><option value="">Select Course</option></select>
+                <input type="date" id="attDate">
+                <button class="primary" onclick="loadAttendanceSheet()">Load Sheet</button>
+            </div>
+            <div id="attSheet" class="card" style="display:none;"><h3 id="attTitle"></h3><div id="attList"></div><div class="actions"><button onclick="saveAttendance()">💾 Save</button><button onclick="markAll('Present')">✅ All Present</button></div></div>
+        </section>
+
+        <section id="reports">
+            <div class="card">
+                <h2>Moderated Session Report</h2>
+                <select id="reportSessionSelect"><option value="">Select Session</option></select>
+                <button class="primary" onclick="loadModeratedReport()">Generate Report</button>
+                <div class="export-btns"><button onclick="exportReportCSV()">📥 Export CSV</button><button onclick="exportReportPDF()">📄 Export PDF</button></div>
+            </div>
+            <div id="reportTable" class="card" style="display:none;"><table><thead><tr><th>Date</th><th>Course</th><th>Teacher</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="reportBody"></tbody></table></div>
+        </section>
+    </main>
+
+   <script>
+  // 🔑 CHANGE THIS TO YOUR DEPLOYED WORKER URL
+  const API_URL = 'https://attendance-sync-api.youraccount.workers.dev';
+  
+  // Async API Wrapper
+  const api = {
+    get: async (path, params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      const res = await fetch(`${API_URL}/api/${path}${q ? '?'+q : ''}`, { headers: { 'Accept': 'application/json' } });
+      return res.json();
+    },
+    post: async (path, body) => {
+      await fetch(`${API_URL}/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    }
+  };
+
+  const DB = { id() { return Date.now().toString(36) + Math.random().toString(36).substr(2); } };
+
+  // State Cache (replaces localStorage)
+  let sessions = [], courses = [], students = [], records = [];
+
+  // Native Storage Bridge (unchanged)
+  function saveToAndroid(fileName, contentOrBlob) {
+    if (typeof AndroidFileSaver === 'undefined') return alert('Storage bridge not available');
+    alert('💾 Saving file to Downloads/AttendanceApp/');
+    const blob = contentOrBlob instanceof Blob ? contentOrBlob : new Blob([contentOrBlob], {type: 'text/csv'});
+    const reader = new FileReader();
+    reader.onloadend = () => AndroidFileSaver.saveFile(fileName, reader.result.split(',')[1], blob.type || 'application/octet-stream');
+    reader.readAsDataURL(blob);
+  }
+
+  // UI Helpers
+  function showLoading(btn) { btn.textContent = '⏳ Syncing...'; btn.disabled = true; }
+  function hideLoading(btn, orig) { btn.textContent = orig; btn.disabled = false; }
+
+  // Tab Navigation
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.onclick = async () => {
+      document.querySelectorAll('nav button, section').forEach(el => el.classList.remove('active'));
+      btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active');
+      await refreshAllDropdowns();
+    };
+  });
+
+  // SESSIONS
+  async function addSession() {
+    const btn = event.target; showLoading(btn, 'Create');
+    const name = document.getElementById('sessionName').value.trim();
+    if (!name || sessions.find(s => s.name === name)) { hideLoading(btn, 'Create'); return alert('Invalid/Exists'); }
+    await api.post('sessions', { id: DB.id(), name });
+    document.getElementById('sessionName').value = '';
+    await loadSessions(); hideLoading(btn, 'Create');
+  }
+  async function loadSessions() {
+    sessions = (await api.get('sessions')).results || [];
+    renderSessions(); refreshDropdowns('session');
+  }
+  function renderSessions() {
+    const list = document.getElementById('sessionList');
+    if (!sessions.length) return list.innerHTML = '<div class="empty">No sessions. Create one above.</div>';
+    list.innerHTML = sessions.map(s => `<div class="card"><strong>${s.name}</strong> <span class="tag">${courses.filter(c=>c.session_id===s.id).length} courses</span> <button onclick="deleteSession('${s.id}')" style="width:auto;float:right;background:var(--danger);color:#fff;border:none;">Delete</button></div>`).join('');
+  }
+  async function deleteSession(id) {
+    if (!confirm('Delete session & all related data?')) return;
+    // Note: Worker handles CASCADE deletes via foreign keys
+    await loadSessions();
+  }
+
+  // COURSES
+  async function addCourse() {
+    const btn = event.target; showLoading(btn, 'Add Course');
+    const session_id = document.getElementById('courseSessionSelect').value;
+    const name = document.getElementById('courseName').value.trim();
+    const teacher = document.getElementById('teacherName').value.trim();
+    if (!session_id || !name || !teacher) { hideLoading(btn, 'Add Course'); return alert('Fill all fields'); }
+    await api.post('courses', { id: DB.id(), session_id, name, teacher });
+    document.getElementById('courseName').value = ''; document.getElementById('teacherName').value = '';
+    await loadCourses(session_id); hideLoading(btn, 'Add Course');
+  }
+  async function loadCourses(sessionId) {
+    courses = sessionId ? (await api.get('courses', { session_id: sessionId })).results || [] : [];
+    renderCourses(sessionId); refreshDropdowns('course');
+  }
+  function renderCourses(sessionId) {
+    const list = document.getElementById('courseList');
+    if (!sessionId) return list.innerHTML = '<div class="empty">Select a session</div>';
+    if (!courses.length) return list.innerHTML = '<div class="empty">No courses in this session</div>';
+    list.innerHTML = courses.map(c => `<div class="card"><strong>${c.name}</strong><br><small>👨‍🏫 ${c.teacher}</small> <button onclick="deleteCourse('${c.id}')" style="width:auto;float:right;background:var(--danger);color:#fff;border:none;">Delete</button></div>`).join('');
+  }
+  async function deleteCourse(id) {
+    if (!confirm('Delete course & related data?')) return;
+    await loadCourses(document.getElementById('courseSessionSelect').value);
+  }
+
+  // STUDENTS
+  async function addStudent() {
+    const btn = event.target; showLoading(btn, 'Add Student');
+    const course_id = document.getElementById('studentCourseSelect').value;
+    const name = document.getElementById('studentName').value.trim();
+    const roll = document.getElementById('studentRoll').value.trim();
+    if (!course_id || !name || !roll) { hideLoading(btn, 'Add Student'); return alert('Fill all fields'); }
+    await api.post('students', { id: DB.id(), course_id, name, roll });
+    document.getElementById('studentName').value = ''; document.getElementById('studentRoll').value = '';
+    await loadStudents(course_id); hideLoading(btn, 'Add Student');
+  }
+  async function loadStudents(courseId) {
+    students = courseId ? (await api.get('students', { course_id: courseId })).results || [] : [];
+    renderStudents(courseId);
+  }
+  function renderStudents(courseId) {
+    const list = document.getElementById('studentList');
+    if (!courseId) return list.innerHTML = '<div class="empty">Select a course</div>';
+    if (!students.length) return list.innerHTML = '<div class="empty">No students registered</div>';
+    list.innerHTML = `<div class="card"><h3>Students</h3>${students.map(s => `<div class="row"><span><strong>${s.roll}</strong> - ${s.name}</span><button onclick="deleteStudent('${s.id}')" style="width:auto;margin-left:auto;background:var(--danger);color:#fff;border:none;">×</button></div>`).join('')}</div>`;
+  }
+  async function deleteStudent(id) {
+    if (!confirm('Remove student?')) return;
+    await loadStudents(document.getElementById('studentCourseSelect').value);
+  }
+
+  // ATTENDANCE
+  async function loadAttendanceSheet() {
+    const courseId = document.getElementById('attCourseSelect').value;
+    const date = document.getElementById('attDate').value;
+    if (!courseId || !date) return alert('Select course & date');
+    const sheet = document.getElementById('attSheet'), list = document.getElementById('attList'), title = document.getElementById('attTitle');
+    sheet.style.display = 'block'; title.textContent = `Attendance - ${date}`;
+    
+    // Fetch existing
+    const existing = (await api.get('attendance', { course_id: courseId, date })).results || [];
+    const statusMap = Object.fromEntries(existing.map(r => [r.student_id, r.status]));
+
+    // Fetch students
+    const studs = (await api.get('students', { course_id: courseId })).results || [];
+    list.innerHTML = studs.map(s => `<div class="row"><div style="flex:1"><strong>${s.roll}</strong><br>${s.name}</div><div><button class="status-btn ${statusMap[s.id]==='Present'?'present':''}" onclick="setStatus('${s.id}','Present',this)">P</button><button class="status-btn ${statusMap[s.id]==='Absent'?'absent':''}" onclick="setStatus('${s.id}','Absent',this)">A</button><button class="status-btn ${statusMap[s.id]==='Late'?'late':''}" onclick="setStatus('${s.id}','Late',this)">L</button></div></div>`).join('');
+    list.dataset.courseId = courseId; list.dataset.date = date;
+  }
+  function setStatus(studentId, status, btn) {
+    const row = btn.parentElement;
+    row.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
+    btn.classList.add(status.toLowerCase());
+  }
+  function markAll(status) {
+    document.querySelectorAll('#attList .status-btn').forEach(btn => { if (btn.textContent === status[0]) btn.click(); });
+  }
+  async function saveAttendance() {
+    const btn = event.target; showLoading(btn, '💾 Saving');
+    const courseId = document.getElementById('attList').dataset.courseId;
+    const date = document.getElementById('attList').dataset.date;
+    const records = [];
+    document.querySelectorAll('#attList .status-btn').forEach(btn => {
+      if (btn.classList.length > 1) {
+        records.push({ course_id: courseId, date, student_id: btn.dataset.studentId, status: btn.classList.contains('present') ? 'Present' : btn.classList.contains('absent') ? 'Absent' : 'Late' });
+      }
+    });
+    if (!records.length) { hideLoading(btn, '💾 Save'); return alert('Mark at least one student'); }
+    await api.post('attendance', records);
+    alert('✅ Synced to cloud!'); hideLoading(btn, '💾 Save');
+  }
+
+  // MODERATED REPORT
+  async function loadModeratedReport() {
+    const sessionId = document.getElementById('reportSessionSelect').value;
+    const table = document.getElementById('reportTable'), body = document.getElementById('reportBody');
+    if (!sessionId) return alert('Select a session');
+    table.style.display = 'block'; body.innerHTML = '<tr><td colspan="6" class="empty">⏳ Loading cloud data...</td></tr>';
+    
+    const data = (await api.get('report', { session_id: sessionId })).results || [];
+    if (!data.length) return body.innerHTML = '<tr><td colspan="6" class="empty">No attendance recorded yet</td></tr>';
+    body.innerHTML = data.map(d => `<tr><td>${d.date}</td><td>${d.course}</td><td>${d.teacher}</td><td>${d.name}</td><td>${d.roll}</td><td><strong class="tag">${d.status}</strong></td></tr>`).join('');
+  }
+  async function exportReportCSV() {
+    const sessionId = document.getElementById('reportSessionSelect').value;
+    if (!sessionId) return alert('Select a session');
+    const data = (await api.get('report', { session_id: sessionId })).results || [];
+    if (!data.length) return alert('No data');
+    const sName = sessions.find(s=>s.id===sessionId)?.name || 'Report';
+    let csv = 'Date,Course,Teacher,Student,Roll,Status\n';
+    data.forEach(d => csv += `"${d.date}","${d.course}","${d.teacher}","${d.name}","${d.roll}","${d.status}"\n`);
+    saveToAndroid(`moderated_${sName}.csv`, csv);
+  }
+  async function exportReportPDF() {
+    const sessionId = document.getElementById('reportSessionSelect').value;
+    if (!sessionId) return alert('Select a session');
+    if (typeof window.jspdf === 'undefined') return alert('PDF library offline');
+    const data = (await api.get('report', { session_id: sessionId })).results || [];
+    if (!data.length) return alert('No data');
+    const { jsPDF } = window.jspdf; const doc = new jsPDF();
+    const sName = sessions.find(s=>s.id===sessionId)?.name || 'Report';
+    doc.setFontSize(18); doc.text(`Moderated Report: ${sName}`, 14, 20);
+    doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
+    doc.autoTable({ head: [['Date','Course','Teacher','Student','Roll','Status']], body: data.map(d=>[d.date,d.course,d.teacher,d.name,d.roll,d.status]), startY:35, theme:'grid', styles:{fontSize:8}, headStyles:{fillColor:[37,99,235]} });
+    saveToAndroid(`moderated_${sName}.pdf`, doc.output('blob'));
+  }
+
+  // DROPDOWNS & INIT
+  async function refreshDropdowns(type) {
+    if (type === 'session' || !type) {
+      const opts = sessions.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      ['courseSessionSelect','studentSessionSelect','attSessionSelect','reportSessionSelect'].forEach(id => {
+        document.getElementById(id).innerHTML = '<option value="">Select Session</option>' + opts;
+      });
+    }
+    if (!document.getElementById('attDate').value) document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
+    renderSessions();
+  }
+  async function init() { await loadSessions(); }
+  init();
+</script>
+</body>
+</html>
