@@ -29,7 +29,6 @@ jobs:
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
-      # 🔑 CRITICAL: Force Gradle 8.4 (compatible with AGP 8.1.4)
       - name: Setup Gradle 8.4
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -48,8 +47,7 @@ jobs:
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
-          # 3. Settings (pluginManagement for Google Maven)
-          cat > settings.gradle << 'EOF'
+          # 3. Settings (pluginManagement for Google Maven)          cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
@@ -60,17 +58,29 @@ jobs:
           rootProject.name = "DigitalAttendance"
           EOF
 
-          # 4. Build file (AGP 8.1.4 + root mapping)
+          # 4. Build file (FIXED: each property on separate line)
           cat > build.gradle << 'EOF'
-          plugins { id 'com.android.application' version '8.1.4' }
+          plugins {
+              id 'com.android.application' version '8.1.4'
+          }
+
           android {
               namespace 'com.attendance.digital'
               compileSdk 34
+
               defaultConfig {
                   applicationId "com.attendance.digital"
-                  minSdk 24 targetSdk 34 versionCode 1 versionName "1.0"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
               }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17 targetCompatibility JavaVersion.VERSION_17 }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+
               sourceSets {
                   main {
                       manifest.srcFile 'AndroidManifest.xml'
@@ -79,12 +89,19 @@ jobs:
                       res.srcDirs = ['res']
                   }
               }
-              lint { abortOnError false; checkReleaseBuilds false }
+
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
           }
-          repositories { google(); mavenCentral() }
+
+          repositories {              google()
+              mavenCentral()
+          }
           EOF
 
-          # 5. Generate wrapper using the now-correct Gradle 8.4 CLI
+          # 5. Generate wrapper using Gradle 8.4 CLI
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
