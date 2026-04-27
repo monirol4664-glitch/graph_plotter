@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Attendance</title>
-    <!-- PDF Generation Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
@@ -46,57 +45,22 @@
     </nav>
     <main>
         <section id="courses" class="active">
-            <div class="card">
-                <h2>Add Course</h2>                <input type="text" id="courseName" placeholder="Course name (e.g., CS101)">
-                <button class="primary" onclick="addCourse()">Create Course</button>
-            </div>
+            <div class="card"><h2>Add Course</h2><input type="text" id="courseName" placeholder="Course name (e.g., CS101)"><button class="primary" onclick="addCourse()">Create Course</button></div>
             <div id="courseList"></div>
-        </section>
-
-        <section id="students">
-            <div class="card">
-                <h2>Register Student</h2>
-                <select id="studentCourseSelect"><option value="">Select Course</option></select>
-                <input type="text" id="studentName" placeholder="Student Name">
-                <input type="text" id="studentRoll" placeholder="Roll Number">
-                <button class="primary" onclick="addStudent()">Add Student</button>
-            </div>
+        </section>        <section id="students">
+            <div class="card"><h2>Register Student</h2><select id="studentCourseSelect"><option value="">Select Course</option></select><input type="text" id="studentName" placeholder="Student Name"><input type="text" id="studentRoll" placeholder="Roll Number"><button class="primary" onclick="addStudent()">Add Student</button></div>
             <div id="studentList"></div>
         </section>
-
         <section id="attendance">
-            <div class="card">
-                <h2>Mark Attendance</h2>
-                <select id="attCourseSelect"><option value="">Select Course</option></select>
-                <input type="date" id="attDate">
-                <button class="primary" onclick="loadAttendanceSheet()">Load Sheet</button>
-            </div>
-            <div id="attSheet" class="card" style="display:none;">
-                <h3 id="attTitle"></h3>
-                <div id="attList"></div>
-                <div class="actions">
-                    <button onclick="saveAttendance()">💾 Save</button>
-                    <button onclick="markAll('Present')">✅ All Present</button>
-                </div>
-            </div>
+            <div class="card"><h2>Mark Attendance</h2><select id="attCourseSelect"><option value="">Select Course</option></select><input type="date" id="attDate"><button class="primary" onclick="loadAttendanceSheet()">Load Sheet</button></div>
+            <div id="attSheet" class="card" style="display:none;"><h3 id="attTitle"></h3><div id="attList"></div><div class="actions"><button onclick="saveAttendance()">💾 Save</button><button onclick="markAll('Present')">✅ All Present</button></div></div>
         </section>
-
         <section id="records">
-            <div class="card">
-                <h2>View & Export</h2>
-                <select id="recCourseSelect"><option value="">Select Course</option></select>
-                <button class="primary" onclick="loadRecords()">Load Records</button>
-                <div class="export-btns">
-                    <button onclick="exportCSV()">📥 Export CSV</button>
-                    <button onclick="exportPDF()">📄 Export PDF</button>
-                </div>
-                <button onclick="clearData()" style="background:var(--danger);color:#fff;border:none;margin-top:8px;">🗑️ Clear All Data</button>
-            </div>
-            <div id="recTable" class="card" style="display:none;">
-                <table><thead><tr><th>Date</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="recBody"></tbody></table>
-            </div>
+            <div class="card"><h2>View & Export</h2><select id="recCourseSelect"><option value="">Select Course</option></select><button class="primary" onclick="loadRecords()">Load Records</button><div class="export-btns"><button onclick="exportCSV()">📥 Export CSV</button><button onclick="exportPDF()">📄 Export PDF</button></div><button onclick="clearData()" style="background:var(--danger);color:#fff;border:none;margin-top:8px;">🗑️ Clear All Data</button></div>
+            <div id="recTable" class="card" style="display:none;"><table><thead><tr><th>Date</th><th>Name</th><th>Roll</th><th>Status</th></tr></thead><tbody id="recBody"></tbody></table></div>
         </section>
     </main>
+
     <script>
         const DB = {
             get(key) { return JSON.parse(localStorage.getItem(`att_${key}`) || '[]'); },
@@ -104,11 +68,23 @@
             id() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
         };
 
+        function saveToAndroid(fileName, contentOrBlob) {
+            if (typeof AndroidFileSaver === 'undefined') return alert('Storage bridge not available');
+            alert('💾 Saving file to Downloads/AttendanceApp/');
+            const blob = contentOrBlob instanceof Blob ? contentOrBlob : new Blob([contentOrBlob], {type: 'text/csv'});
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result.split(',')[1];
+                const mime = blob.type || 'application/octet-stream';
+                AndroidFileSaver.saveFile(fileName, base64, mime);
+            };
+            reader.readAsDataURL(blob);
+        }
+
         document.querySelectorAll('nav button').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('nav button, section').forEach(el => el.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById(btn.dataset.tab).classList.add('active');
+                btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active');
                 refreshDropdowns();
             };
         });
@@ -118,19 +94,14 @@
             if (!name) return alert('Enter course name');
             const courses = DB.get('courses');
             if (courses.find(c => c.name.toLowerCase() === name.toLowerCase())) return alert('Course exists');
-            courses.push({ id: DB.id(), name });
-            DB.set('courses', courses);
-            document.getElementById('courseName').value = '';
-            renderCourses(); refreshDropdowns();
-        }
-
-        function renderCourses() {
+            courses.push({ id: DB.id(), name }); DB.set('courses', courses);
+            document.getElementById('courseName').value = ''; renderCourses(); refreshDropdowns();
+        }        function renderCourses() {
             const list = document.getElementById('courseList');
             const courses = DB.get('courses');
             if (!courses.length) return list.innerHTML = '<div class="empty">No courses yet</div>';
             list.innerHTML = courses.map(c => `<div class="card"><strong>${c.name}</strong> <button onclick="deleteCourse('${c.id}')" style="width:auto;float:right;background:var(--danger);color:#fff;border:none;">Delete</button></div>`).join('');
         }
-
         function deleteCourse(id) {
             if (!confirm('Delete course and all related data?')) return;
             let courses = DB.get('courses').filter(c => c.id !== id);
@@ -139,20 +110,17 @@
             DB.set('courses', courses); DB.set('students', students); DB.set('records', records);
             renderCourses(); refreshDropdowns();
         }
-
         function addStudent() {
             const courseId = document.getElementById('studentCourseSelect').value;
             const name = document.getElementById('studentName').value.trim();
             const roll = document.getElementById('studentRoll').value.trim();
             if (!courseId || !name || !roll) return alert('Fill all fields');
-            const students = DB.get('students');            if (students.find(s => s.courseId === courseId && s.roll === roll)) return alert('Roll number exists in this course');
-            students.push({ id: DB.id(), courseId, name, roll });
-            DB.set('students', students);
-            document.getElementById('studentName').value = '';
-            document.getElementById('studentRoll').value = '';
+            const students = DB.get('students');
+            if (students.find(s => s.courseId === courseId && s.roll === roll)) return alert('Roll number exists in this course');
+            students.push({ id: DB.id(), courseId, name, roll }); DB.set('students', students);
+            document.getElementById('studentName').value = ''; document.getElementById('studentRoll').value = '';
             renderStudents(courseId); refreshDropdowns();
         }
-
         function renderStudents(courseId) {
             const list = document.getElementById('studentList');
             if (!courseId) return list.innerHTML = '<div class="empty">Select a course first</div>';
@@ -160,7 +128,6 @@
             if (!students.length) return list.innerHTML = '<div class="empty">No students registered</div>';
             list.innerHTML = `<div class="card"><h3>Students</h3>${students.map(s => `<div class="student-row"><span><strong>${s.roll}</strong> - ${s.name}</span><button onclick="deleteStudent('${s.id}')" style="width:auto;margin-left:auto;background:var(--danger);color:#fff;border:none;">×</button></div>`).join('')}</div>`;
         }
-
         function deleteStudent(id) {
             if (!confirm('Remove student?')) return;
             let students = DB.get('students').filter(s => s.id !== id);
@@ -168,50 +135,26 @@
             DB.set('students', students); DB.set('records', records);
             document.getElementById('studentCourseSelect').value && renderStudents(document.getElementById('studentCourseSelect').value);
         }
-
         function loadAttendanceSheet() {
             const courseId = document.getElementById('attCourseSelect').value;
             const date = document.getElementById('attDate').value;
             if (!courseId || !date) return alert('Select course and date');
             const students = DB.get('students').filter(s => s.courseId === courseId);
             if (!students.length) return alert('No students in this course');
-
-            const sheet = document.getElementById('attSheet');
-            const list = document.getElementById('attList');
-            const title = document.getElementById('attTitle');
-            sheet.style.display = 'block';
-            title.textContent = `Attendance Sheet - ${date}`;
-
+            const sheet = document.getElementById('attSheet'), list = document.getElementById('attList'), title = document.getElementById('attTitle');
+            sheet.style.display = 'block'; title.textContent = `Attendance Sheet - ${date}`;
             const existing = DB.get('records').find(r => r.courseId === courseId && r.date === date);
             const statusMap = existing ? Object.fromEntries(existing.records.map(r => [r.studentId, r.status])) : {};
-
-            list.innerHTML = students.map(s => `
-                <div class="student-row">
-                    <div style="flex:1"><strong>${s.roll}</strong><br>${s.name}</div>
-                    <div>
-                        <button class="status-btn ${statusMap[s.id]==='Present'?'present':''}" onclick="setStatus('${s.id}','Present',this)">P</button>
-                        <button class="status-btn ${statusMap[s.id]==='Absent'?'absent':''}" onclick="setStatus('${s.id}','Absent',this)">A</button>
-                        <button class="status-btn ${statusMap[s.id]==='Late'?'late':''}" onclick="setStatus('${s.id}','Late',this)">L</button>
-                    </div>
-                </div>
-            `).join('');            list.dataset.courseId = courseId;
-            list.dataset.date = date;
+            list.innerHTML = students.map(s => `<div class="student-row"><div style="flex:1"><strong>${s.roll}</strong><br>${s.name}</div><div><button class="status-btn ${statusMap[s.id]==='Present'?'present':''}" onclick="setStatus('${s.id}','Present',this)">P</button><button class="status-btn ${statusMap[s.id]==='Absent'?'absent':''}" onclick="setStatus('${s.id}','Absent',this)">A</button><button class="status-btn ${statusMap[s.id]==='Late'?'late':''}" onclick="setStatus('${s.id}','Late',this)">L</button></div></div>`).join('');            list.dataset.courseId = courseId; list.dataset.date = date;
         }
-
         function setStatus(studentId, status, btn) {
             const row = btn.parentElement;
             row.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
-            btn.classList.add(status.toLowerCase());
-            btn.dataset.status = status;
-            btn.dataset.studentId = studentId;
+            btn.classList.add(status.toLowerCase()); btn.dataset.status = status; btn.dataset.studentId = studentId;
         }
-
         function markAll(status) {
-            document.querySelectorAll('#attList .status-btn').forEach(btn => {
-                if (btn.textContent === status[0]) btn.click();
-            });
+            document.querySelectorAll('#attList .status-btn').forEach(btn => { if (btn.textContent === status[0]) btn.click(); });
         }
-
         function saveAttendance() {
             const courseId = document.getElementById('attList').dataset.courseId;
             const date = document.getElementById('attList').dataset.date;
@@ -222,20 +165,13 @@
                 }
             });
             if (records.length === 0) return alert('Mark at least one student');
-            
             let all = DB.get('records').filter(r => !(r.courseId === courseId && r.date === date));
-            all.push({ courseId, date, records });
-            DB.set('records', all);
-            alert('Attendance saved!');
+            all.push({ courseId, date, records }); DB.set('records', all); alert('Attendance saved!');
         }
-
         function loadRecords() {
             const courseId = document.getElementById('recCourseSelect').value;
-            const table = document.getElementById('recTable');
-            const body = document.getElementById('recBody');
-            if (!courseId) return alert('Select a course');
-            table.style.display = 'block';
-
+            const table = document.getElementById('recTable'), body = document.getElementById('recBody');
+            if (!courseId) return alert('Select a course'); table.style.display = 'block';
             const recs = DB.get('records').filter(r => r.courseId === courseId).sort((a,b) => b.date.localeCompare(a.date));
             const students = DB.get('students');
             body.innerHTML = recs.flatMap(r => r.records.map(rec => {
@@ -253,31 +189,19 @@
                 const s = students.find(st => st.id === rec.studentId) || {name:'Unknown', roll:'?'};
                 csv += `"${r.date}","${s.name}","${s.roll}","${rec.status}"\n`;
             }));
-            const blob = new Blob([csv], {type:'text/csv'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `attendance_${courseId}.csv`; a.click();
+            saveToAndroid(`attendance_${courseId}.csv`, csv);
         }
-
         function exportPDF() {
             const courseId = document.getElementById('recCourseSelect').value;
             if (!courseId) return alert('Select a course to export');
-            if (typeof window.jspdf === 'undefined') return alert('PDF library not loaded. Check internet connection and reload.');
-            
-            const { jsPDF } = window.jspdf;
+            if (typeof window.jspdf === 'undefined') return alert('PDF library not loaded. Check internet and reload.');            const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            
             const courses = DB.get('courses');
             const courseName = courses.find(c => c.id === courseId)?.name || 'Unknown Course';
-            
-            doc.setFontSize(18);
-            doc.text(`Attendance Report: ${courseName}`, 14, 20);
-            doc.setFontSize(11);
-            doc.setTextColor(100);
-            doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
-            
+            doc.setFontSize(18); doc.text(`Attendance Report: ${courseName}`, 14, 20);
+            doc.setFontSize(11); doc.setTextColor(100); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
             const records = DB.get('records').filter(r => r.courseId === courseId);
             const students = DB.get('students');
-            
             const tableData = [];
             records.sort((a,b) => a.date.localeCompare(b.date)).forEach(r => {
                 r.records.forEach(rec => {
@@ -285,27 +209,15 @@
                     tableData.push([r.date, s.name, s.roll, rec.status]);
                 });
             });
-            
-            doc.autoTable({
-                head: [['Date', 'Student Name', 'Roll', 'Status']],
-                body: tableData,
-                startY: 35,
-                theme: 'grid',
-                styles: { fontSize: 9 },
-                headStyles: { fillColor: [37, 99, 235] }            });
-            
-            doc.save(`attendance_${courseName.replace(/\s+/g, '_')}.pdf`);
+            doc.autoTable({ head: [['Date', 'Student Name', 'Roll', 'Status']], body: tableData, startY: 35, theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] } });
+            saveToAndroid(`attendance_${courseName.replace(/\s+/g, '_')}.pdf`, doc.output('blob'));
         }
-
         function clearData() {
             if (confirm('Delete ALL attendance data permanently?')) {
-                localStorage.removeItem('att_courses');
-                localStorage.removeItem('att_students');
-                localStorage.removeItem('att_records');
+                localStorage.removeItem('att_courses'); localStorage.removeItem('att_students'); localStorage.removeItem('att_records');
                 location.reload();
             }
         }
-
         function refreshDropdowns() {
             const courses = DB.get('courses');
             const opts = courses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
