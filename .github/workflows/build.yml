@@ -32,61 +32,34 @@ jobs:
 
       - name: Generate Project Structure
         run: |
-          # Create standard Android directories
           mkdir -p src/main/java/com/attendance/digital
           mkdir -p src/main/assets
           mkdir -p src/main/res/values
 
-          # Move source files to expected locations
           cp AndroidManifest.xml src/main/AndroidManifest.xml
           cp MainActivity.java src/main/java/com/attendance/digital/
           cp index.html src/main/assets/
 
-          # Create minimal resources
           echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > src/main/res/values/strings.xml
 
-          # Create gradle.properties
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.nonTransitiveRClass=true' >> gradle.properties
           echo 'org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' >> gradle.properties
 
-          # Create settings.gradle
           printf 'pluginManagement {\n    repositories { google(); mavenCentral(); gradlePluginPortal() }\n}\ndependencyResolutionManagement {\n    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n    repositories { google(); mavenCentral() }\n}\nrootProject.name = "DigitalAttendance"\n' > settings.gradle
 
-          # Create build.gradle with STANDARD paths
-          printf "plugins {\n    id 'com.android.application' version '8.1.4'\n}\n\nandroid {\n    namespace 'com.attendance.digital'\n    compileSdk 34\n\n    defaultConfig {\n        applicationId \"com.attendance.digital\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n\n    lint {\n        abortOnError false\n        checkReleaseBuilds false\n    }\n}\n" > build.gradle
+          printf "plugins {\n    id 'com.android.application' version '8.1.4'\n}\n\nandroid {\n    namespace 'com.attendance.digital'\n    compileSdk 34\n\n    defaultConfig {\n        applicationId \"com.attendance.digital\"\n        minSdk 24\n        targetSdk 34\n        versionCode 1\n        versionName \"1.0\"\n    }\n\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n}\n" > build.gradle
 
-          # Generate Gradle Wrapper
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Find and Verify APK
-        run: |
-          echo "🔍 Searching for APK..."
-          find . -name "*.apk" -type f
-          
-          # Set APK_PATH variable
-          APK_PATH=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | head -n1)
-          
-          if [ -z "$APK_PATH" ]; then
-            echo "❌ APK not found!"
-            exit 1
-          fi
-          
-          echo "✅ Found APK: $APK_PATH"
-          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
-          
-          # Show APK details
-          ls -lh "$APK_PATH"
-          file "$APK_PATH"
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: attendance-app-debug
-          path: ${{ env.APK_PATH }}
+          path: |
+            build/outputs/apk/debug/app-debug.apk
           retention-days: 7
-          if-no-files-found: error
