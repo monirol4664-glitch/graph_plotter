@@ -1,4 +1,4 @@
-name: Android APK Build
+name: Android Build
 
 on:
   push:
@@ -27,14 +27,14 @@ jobs:
       - name: Accept Licenses & Install SDK
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest" > /dev/null
 
       - name: Setup Gradle CLI
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Generate Project Structure & Wrapper
+      - name: Generate Project & Gradle Wrapper
         run: |
-          # 1. Minimal Android resource dir (strict AGP requirement)
+          # 1. Create minimal Android resource dir (strict AGP requirement)
           mkdir -p res/values
           echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">Attendance</string></resources>' > res/values/strings.xml
 
@@ -47,7 +47,8 @@ jobs:
 
           # 3. Settings (CRITICAL: pluginManagement for Google Maven)
           cat > settings.gradle << 'EOF'
-          pluginManagement {              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -64,15 +65,9 @@ jobs:
               compileSdk 34
               defaultConfig {
                   applicationId "com.attendance.digital"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  minSdk 24 targetSdk 34 versionCode 1 versionName "1.0"
               }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17 targetCompatibility JavaVersion.VERSION_17 }
               sourceSets {
                   main {
                       manifest.srcFile 'AndroidManifest.xml'
@@ -81,23 +76,21 @@ jobs:
                       res.srcDirs = ['res']
                   }
               }
-              lint {
-                  abortOnError false
-                  checkReleaseBuilds false
-              }
+              lint { abortOnError false; checkReleaseBuilds false }
           }
           repositories { google(); mavenCentral() }
           EOF
 
-          # 5. Generate official Gradle Wrapper (uses CLI from setup-gradle)
+          # 5. Generate official Gradle Wrapper (creates JAR, properties & scripts)
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK        uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: attendance-app-debug
+          name: attendance-apk
           path: build/outputs/apk/debug/app-debug.apk
           retention-days: 7
